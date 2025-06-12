@@ -237,8 +237,7 @@ class InterviewService:
                 "completed_sessions": 0,
                 "total_questions": 0,
                 "total_answers": 0,
-                "average_score": 0,
-                "completion_rate": 0
+                "average_score": 0,                "completion_rate": 0
             }
 
     async def save_recording(self, recording_data: dict) -> str:
@@ -246,8 +245,13 @@ class InterviewService:
         try:
             from ..models.interview_models import InterviewRecording
             from bson import ObjectId
-              # Create recording document
+            
+            # Generate custom recording ID
+            recording_id = str(uuid.uuid4())
+            
+            # Create recording document
             recording = InterviewRecording(
+                recording_id=recording_id,  # Use custom string ID
                 user_id=ObjectId(str(recording_data['user_id'])),
                 session_id=str(recording_data['session_id']),  # Keep as string
                 question_index=recording_data['question_index'],
@@ -264,11 +268,9 @@ class InterviewService:
                 db = get_database()
                 recordings_collection = db.interview_recordings
                 result = await recordings_collection.insert_one(recording.dict(by_alias=True))
-                recording_id = str(result.inserted_id)
-                logger.info(f"Saved recording {recording_id} to MongoDB")
+                logger.info(f"Saved recording with ID: {recording_id} to MongoDB for session: {recording_data['session_id']}")
             else:
                 # Use in-memory database (simplified storage)
-                recording_id = str(uuid.uuid4())
                 if not hasattr(memory_db, 'recordings'):
                     memory_db.recordings = {}
                 memory_db.recordings[recording_id] = recording.dict()
@@ -287,14 +289,17 @@ class InterviewService:
                 # Use MongoDB
                 db = get_database()
                 recordings_collection = db.interview_recordings
-                  # Query by session_id as string (no ObjectId conversion needed)
+                
+                # Query by session_id as string (no ObjectId conversion needed)
                 cursor = recordings_collection.find({
                     "session_id": session_id
                 }).sort("question_index", 1)
-                
                 recordings = []
                 async for recording in cursor:
-                    recording["_id"] = str(recording["_id"])
+                    logger.info(f"Found recording with _id: {recording['_id']}, session_id: {recording.get('session_id')}")
+                    # Use recording_id if available, otherwise use _id
+                    recording_id = recording.get('_id', str(recording.get('_id')))
+                    recording["recording_id"] = recording_id
                     recording["user_id"] = str(recording["user_id"])
                     # session_id is already a string, no conversion needed
                     # Don't include large audio_data in list response
@@ -316,7 +321,6 @@ class InterviewService:
                         recording_copy.pop("audio_data", None)
                         recording_copy['_id'] = recording_id
                         recordings.append(recording_copy)
-                        
                 # Sort by question_index
                 recordings.sort(key=lambda x: x.get('question_index', 0))
                 logger.info(f"Retrieved {len(recordings)} recordings for session {session_id} from memory")
@@ -329,30 +333,48 @@ class InterviewService:
     async def get_recording(self, recording_id: str) -> Optional[dict]:
         """Get a specific recording including audio data"""
         try:
+            logger.info(f"Getting recording with ID: {recording_id}")
             if is_connected():
                 # Use MongoDB
                 db = get_database()
                 recordings_collection = db.interview_recordings
                 
-                from bson import ObjectId
-                recording = await recordings_collection.find_one({
-                    "_id": ObjectId(recording_id)
-                })
+                # Debug: Check if collection exists and has documents
+                total_count = await recordings_collection.count_documents({})
+                logger.info(f"Total recordings in collection: {total_count}")
+                  # Query by recording_id field instead of _id ObjectId
+                query = {"_id": recording_id}  # Since recording_id is stored as _id
+                logger.info(f"Querying with recording_id: {recording_id}")
+                
+                recording = await recordings_collection.find_one(query)
+                
                 if recording:
-                    recording["_id"] = str(recording["_id"])
+                    logger.info(f"Found recording in MongoDB: {recording['_id']}")
+                    recording["recording_id"] = str(recording["_id"])
                     recording["user_id"] = str(recording["user_id"])
                     # session_id is already a string, no conversion needed
+                    return recording
+                else:
+                    logger.warning(f"Recording not found in MongoDB for ID: {recording_id}")
                     
-                return recording
+                    # Debug: Show some existing IDs for comparison
+                    sample_recordings = []
+                    async for sample in recordings_collection.find({}).limit(3):
+                        sample_recordings.append(str(sample['_id']))
+                    logger.info(f"Sample recording IDs in database: {sample_recordings}")
+                    
+                    return None
             else:
                 # Use in-memory database
+                logger.info(f"Using in-memory database for recording: {recording_id}")
                 if hasattr(memory_db, 'recordings') and recording_id in memory_db.recordings:
                     recording = memory_db.recordings[recording_id].copy()
                     recording['_id'] = recording_id
                     return recording
+                else:
+                    logger.warning(f"Recording not found in memory database for ID: {recording_id}")
+                    return None
                     
-                return None
-                
         except Exception as e:
             logger.error(f"Error getting recording {recording_id}: {str(e)}")
-            raise
+            return None

@@ -67,6 +67,8 @@ const InterviewSession = () => {
       const recordingData = enhancedLiveSpeechRef.current?.getLastRecordingData();
       if (recordingData) {
         await uploadRecording(recordingData);
+        // Clear the recording UI after successful upload
+        enhancedLiveSpeechRef.current?.clearRecording();
       }
       
       if (response.completed) {
@@ -107,7 +109,6 @@ const InterviewSession = () => {
       reader.readAsDataURL(blob);
     });
   };
-
   // Upload recording to database
   const uploadRecording = async (recordingData) => {
     if (!recordingData || !recordingData.audioBlob) {
@@ -115,6 +116,13 @@ const InterviewSession = () => {
     }
 
     try {
+      console.log('Uploading recording data:', {
+        duration: recordingData.duration,
+        fileSize: recordingData.audioBlob.size,
+        mimeType: recordingData.audioBlob.type,
+        transcriptLength: recordingData.transcript?.length || 0
+      });
+
       // Convert blob to base64
       const base64Audio = await convertBlobToBase64(recordingData.audioBlob);
       
@@ -122,11 +130,16 @@ const InterviewSession = () => {
         session_id: sessionId,
         question_index: session.current_question,
         audio_data: base64Audio,
-        duration: recordingData.duration,
+        duration: Number(recordingData.duration) || 0, // Ensure it's a number
         transcript: recordingData.transcript || '',
-        file_size: recordingData.audioBlob.size,
+        file_size: Number(recordingData.audioBlob.size) || 0, // Ensure it's a number
         mime_type: recordingData.audioBlob.type || 'audio/webm'
       };
+
+      console.log('Sending upload data:', {
+        ...uploadData,
+        audio_data: `[${uploadData.audio_data.length} chars]` // Don't log the full audio data
+      });
 
       const response = await interviewAPI.saveRecording(uploadData);
       
@@ -138,7 +151,16 @@ const InterviewSession = () => {
       }
     } catch (error) {
       console.error('Error uploading recording:', error);
-      toast.error('Failed to upload recording, but answer was submitted successfully');
+      // More specific error messages
+      if (error.response?.status === 400) {
+        toast.error('❌ Recording data invalid - check required fields');
+      } else if (error.response?.status === 403) {
+        toast.error('❌ Access denied - session not authorized');
+      } else if (error.response?.status === 404) {
+        toast.error('❌ Session not found');
+      } else {
+        toast.error('❌ Failed to upload recording, but answer was submitted successfully');
+      }
     }
   };
 

@@ -118,7 +118,7 @@ class JobDescription(BaseModel):
     raw_text: str
 
 class InterviewRecording(BaseModel):
-    id: Optional[PyObjectId] = Field(default_factory=PyObjectId, alias="_id")
+    recording_id: str = Field(alias="_id")  # Use custom string ID instead of ObjectId
     user_id: PyObjectId
     session_id: str  # Keep as string since we use UUIDs for session IDs
     question_index: int

@@ -14,6 +14,9 @@ import FormDemo from './pages/FormDemo';
 import VoiceRecordingDemo from './pages/VoiceRecordingDemo';
 import VoiceTranscriptionTest from './pages/VoiceTranscriptionTest';
 import SimplifiedVoiceDemo from './pages/SimplifiedVoiceDemo';
+import RecordingTest from './pages/RecordingTest';
+import RecordingResultsTest from './pages/RecordingResultsTest';
+import AudioPlayerDebug from './pages/AudioPlayerDebug';
 
 function App() {
   return (
@@ -23,10 +26,10 @@ function App() {
         <main className="container mx-auto px-4 py-8">
           <Routes>
             <Route path="/" element={<Home />} />
-            <Route path="/forms-demo" element={<FormDemo />} />
-            <Route path="/voice-demo" element={<VoiceRecordingDemo />} />
-            <Route path="/voice-test" element={<VoiceTranscriptionTest />} />
-            <Route path="/voice-simple" element={<SimplifiedVoiceDemo />} />
+            <Route path="/forms-demo" element={<FormDemo />} />            <Route path="/voice-demo" element={<VoiceRecordingDemo />} />
+            <Route path="/voice-test" element={<VoiceTranscriptionTest />} />            <Route path="/voice-simple" element={<SimplifiedVoiceDemo />} />            <Route path="/recording-test" element={<RecordingTest />} />
+            <Route path="/recording-results-test" element={<RecordingResultsTest />} />
+            <Route path="/audio-debug" element={<AudioPlayerDebug />} />
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<Signup />} />
             <Route path="/interview" element={

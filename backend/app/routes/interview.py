@@ -1,4 +1,5 @@
 from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends
 from typing import Dict, List, Any
 from ..services.gemini_service import GeminiService
 from ..services.interview_service import InterviewService
@@ -372,6 +373,7 @@ async def get_user_stats(current_user: User = Depends(get_current_user)):
         )
 
 @router.post("/save-recording")
+@router.post("/save-recording")
 async def save_recording(request: dict, current_user: User = Depends(get_current_user)):
     """Save audio recording for an interview session"""
     
@@ -380,6 +382,7 @@ async def save_recording(request: dict, current_user: User = Depends(get_current
             status_code=500,
             detail="Interview service not available."
         )
+        
     try:
         session_id = request.get('session_id')
         question_index = request.get('question_index')
@@ -389,10 +392,28 @@ async def save_recording(request: dict, current_user: User = Depends(get_current
         file_size = request.get('file_size')
         mime_type = request.get('mime_type', 'audio/webm')
         
-        if not all([session_id, question_index is not None, audio_data, duration, file_size]):
+        # Debug logging
+        logger.info(f"Received recording request: session_id={session_id}, question_index={question_index}, "
+                   f"audio_data_length={len(audio_data) if audio_data else 0}, duration={duration}, "
+                   f"file_size={file_size}, mime_type={mime_type}")
+        
+        # Validate required fields
+        missing_fields = []
+        if not session_id:
+            missing_fields.append('session_id')
+        if question_index is None:
+            missing_fields.append('question_index')
+        if not audio_data:
+            missing_fields.append('audio_data')
+        if duration is None:
+            missing_fields.append('duration')
+        if file_size is None:
+            missing_fields.append('file_size')
+            
+        if missing_fields:
             raise HTTPException(
                 status_code=400,
-                detail="session_id, question_index, audio_data, duration, and file_size are required"
+                detail=f"Missing required fields: {', '.join(missing_fields)}"
             )
         
         # Validate session exists and belongs to user
@@ -465,4 +486,45 @@ async def get_session_recordings(session_id: str, current_user: User = Depends(g
         raise HTTPException(
             status_code=500,
             detail=f"Error getting recordings: {str(e)}"
+        )
+
+@router.get("/recording/{recording_id}")
+async def get_recording(recording_id: str, current_user: User = Depends(get_current_user)):
+    """Get a specific recording with audio data"""
+    if not interview_service:
+        raise HTTPException(
+            status_code=500,
+            detail="Interview service not available."
+        )
+    
+    try:
+        logger.info(f"Fetching recording with ID: {recording_id}")
+        
+        recording = await interview_service.get_recording(recording_id)
+        
+        if not recording:
+            logger.warning(f"Recording not found for ID: {recording_id}")
+            raise HTTPException(status_code=404, detail="Recording not found")
+        
+        logger.info(f"Found recording for ID: {recording_id}, session: {recording.get('session_id')}")
+        
+        # Verify the recording belongs to the current user
+        # We need to check if the session belongs to the user
+        session = await interview_service.get_session(recording.get('session_id'), str(current_user.id))
+        if not session:
+            logger.warning(f"Access denied for recording {recording_id} - session not found or not owned by user")
+            raise HTTPException(status_code=403, detail="Access denied")
+        
+        return {
+            "success": True,
+            "recording": recording
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting recording {recording_id}: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error getting recording: {str(e)}"
         )

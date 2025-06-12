@@ -109,11 +109,10 @@ const EnhancedLiveSpeech = forwardRef(({
         const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
         const audioUrl = URL.createObjectURL(audioBlob);
         setAudioURL(audioUrl);
-        
-        // Store recording data for later use when submitting answer
+          // Store recording data for later use when submitting answer
         const recordingData = {
           audioBlob,
-          duration,
+          duration: duration, // Keep as number (seconds)
           transcript,
           timestamp: new Date().toISOString()
         };
@@ -209,41 +208,6 @@ const EnhancedLiveSpeech = forwardRef(({
       startEnhancedLiveSpeech();
     }
   };
-
-  // Play/pause recorded audio
-  const togglePlayback = () => {
-    if (!audioURL) return;
-
-    if (!audioElementRef.current) {
-      audioElementRef.current = new Audio(audioURL);
-      
-      audioElementRef.current.onloadedmetadata = () => {
-        setAudioDuration(audioElementRef.current.duration);
-      };
-      
-      audioElementRef.current.ontimeupdate = () => {
-        setCurrentTime(audioElementRef.current.currentTime);
-      };
-      
-      audioElementRef.current.onended = () => {
-        setIsPlaying(false);
-        setCurrentTime(0);
-      };
-    }
-
-    if (isPlaying) {
-      audioElementRef.current.pause();
-      setIsPlaying(false);
-    } else {
-      audioElementRef.current.play()
-        .then(() => setIsPlaying(true))
-        .catch(error => {
-          console.error('Audio playback error:', error);
-          toast.error('Failed to play audio');
-        });
-    }
-  };
-
   // Download audio
   const downloadAudio = () => {
     if (!audioURL) return;
@@ -255,9 +219,31 @@ const EnhancedLiveSpeech = forwardRef(({
     a.click();
     document.body.removeChild(a);
     toast.success('Recording downloaded!');
-  };  // Get last recording data for upload when submitting answer
+  };  // Clear all recording state
+  const clearRecording = () => {
+    setAudioURL(null);
+    setTranscript('');
+    setInterimTranscript('');
+    setDuration(0);
+    setCurrentTime(0);
+    setAudioDuration(0);
+    setIsPlaying(false);
+    lastRecordingDataRef.current = null;
+    
+    // Clean up audio element
+    if (audioElementRef.current) {
+      audioElementRef.current.pause();
+      audioElementRef.current = null;
+    }
+    
+    // Clear audio chunks
+    audioChunksRef.current = [];
+  };
+
+  // Get last recording data for upload when submitting answer
   useImperativeHandle(ref, () => ({
-    getLastRecordingData: () => lastRecordingDataRef.current
+    getLastRecordingData: () => lastRecordingDataRef.current,
+    clearRecording: clearRecording
   }));
 
   // Format time as MM:SS
@@ -313,42 +299,49 @@ const EnhancedLiveSpeech = forwardRef(({
             )}
           </div>
         </div>
-      )}
-
-      {/* Recorded Audio Playback */}
+      )}      {/* Recorded Audio Playback */}
       {audioURL && !isActive && (
         <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 space-y-3">
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium text-gray-700">
-              Recorded Speech (will be uploaded when you submit answer)
+              🎤 Recorded Speech (will be uploaded when you submit answer)
             </span>
             <span className="text-sm text-gray-500">{formatTime(audioDuration)}</span>
           </div>
           
-          {/* Progress Bar */}
-          <div className="w-full bg-gray-200 rounded-full h-2">
-            <div 
-              className="bg-blue-500 h-2 rounded-full transition-all duration-100"
-              style={{ width: `${audioDuration > 0 ? (currentTime / audioDuration) * 100 : 0}%` }}
-            ></div>
-          </div>
+          {/* HTML5 Audio Player */}
+          <audio 
+            ref={audioElementRef}
+            controls 
+            src={audioURL}
+            className="w-full h-10"
+            preload="metadata"
+            onLoadedMetadata={(e) => {
+              setAudioDuration(e.target.duration);
+              console.log('Audio loaded, duration:', e.target.duration);
+            }}
+            onTimeUpdate={(e) => {
+              setCurrentTime(e.target.currentTime);
+            }}
+            onPlay={() => setIsPlaying(true)}
+            onPause={() => setIsPlaying(false)}
+            onEnded={() => {
+              setIsPlaying(false);
+              setCurrentTime(0);
+            }}
+            onError={() => toast.error('Failed to load audio recording')}
+          >
+            Your browser does not support the audio element.
+          </audio>
           
-          <div className="flex items-center gap-2">
-            <button
-              onClick={togglePlayback}
-              className="flex items-center gap-2 px-3 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-medium"
-            >
-              {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-              <span>{isPlaying ? 'Pause' : 'Play'}</span>
-            </button>
-            
+          <div className="flex items-center justify-between">
             <span className="text-sm text-gray-600">
               {formatTime(currentTime)} / {formatTime(audioDuration)}
             </span>
               
             <button
               onClick={downloadAudio}
-              className="flex items-center gap-2 px-3 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded-lg font-medium ml-auto"
+              className="flex items-center gap-2 px-3 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded-lg font-medium text-sm"
             >
               <Download className="h-4 w-4" />
               <span>Download</span>
