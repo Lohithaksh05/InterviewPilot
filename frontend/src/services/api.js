@@ -168,6 +168,24 @@ export const interviewAPI = {
     const response = await apiClient.delete(`/interview/session/${sessionId}`);
     return response.data;
   },
+
+  // Save audio recording
+  saveRecording: async (recordingData) => {
+    const response = await apiClient.post('/interview/save-recording', recordingData);
+    return response.data;
+  },
+
+  // Get session recordings
+  getSessionRecordings: async (sessionId) => {
+    const response = await apiClient.get(`/interview/recordings/${sessionId}`);
+    return response.data;
+  },
+
+  // Get specific recording (including audio data)
+  getRecording: async (recordingId) => {
+    const response = await apiClient.get(`/interview/recording/${recordingId}`);
+    return response.data;
+  },
 };
 
 // Agents API

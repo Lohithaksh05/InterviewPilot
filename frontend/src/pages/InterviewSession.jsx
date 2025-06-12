@@ -1,42 +1,41 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Mic, MicOff, Send, ArrowRight, Clock, MessageCircle } from 'lucide-react';
+import { Send, ArrowRight, Clock, MessageCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { interviewAPI } from '../services/api';
+import EnhancedLiveSpeech from '../components/EnhancedLiveSpeechSimple';
 
 const InterviewSession = () => {
   const { sessionId } = useParams();
   const navigate = useNavigate();
   const [session, setSession] = useState(null);
   const [currentAnswer, setCurrentAnswer] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [isRecording, setIsRecording] = useState(false);
+  const [loading, setLoading] = useState(false);  const [submitting, setSubmitting] = useState(false);
   const answerRef = useRef(null);
-
+  const enhancedLiveSpeechRef = useRef(null);
   useEffect(() => {
-    if (sessionId) {
-      fetchSession();
-    }
-  }, [sessionId]);
-
-  const fetchSession = async () => {
-    setLoading(true);
-    try {
-      const response = await interviewAPI.getSession(sessionId);
-      setSession(response);
-      
-      if (response.completed) {
-        navigate(`/results/${sessionId}`);
+    const fetchSessionData = async () => {
+      setLoading(true);
+      try {
+        const response = await interviewAPI.getSession(sessionId);
+        setSession(response);
+        
+        if (response.completed) {
+          navigate(`/results/${sessionId}`);
+        }
+      } catch (error) {
+        console.error('Error fetching session:', error);
+        toast.error(error.message || 'Failed to load interview session');
+        navigate('/interview');
+      } finally {
+        setLoading(false);
       }
-    } catch (error) {
-      console.error('Error fetching session:', error);
-      toast.error(error.message || 'Failed to load interview session');
-      navigate('/interview');
-    } finally {
-      setLoading(false);
+    };
+
+    if (sessionId) {
+      fetchSessionData();
     }
-  };
+  }, [sessionId, navigate]);
 
   const submitAnswer = async () => {
     if (!currentAnswer.trim()) {
@@ -59,12 +58,16 @@ const InterviewSession = () => {
         completed: response.completed
       }));
         setCurrentAnswer('');
-      
-      // Show score in toast
+        // Show score in toast
       const score = response.evaluation?.score || 'N/A';
       toast.success(`Answer submitted! Score: ${score}/10`, {
         icon: score >= 8 ? '🎉' : score >= 6 ? '👍' : '💪'
-      });
+      });      // Upload recording if there's one from this session
+      // Get recording data directly from the component via ref
+      const recordingData = enhancedLiveSpeechRef.current?.getLastRecordingData();
+      if (recordingData) {
+        await uploadRecording(recordingData);
+      }
       
       if (response.completed) {
         toast.success('Interview completed! Redirecting to results...');
@@ -77,16 +80,65 @@ const InterviewSession = () => {
       toast.error(error.message || 'Failed to submit answer');
     } finally {
       setSubmitting(false);
-    }
+    }  };
+  // Handle enhanced live speech transcription
+  const handleTranscriptionUpdate = (text) => {
+    setCurrentAnswer(text);
+  };
+  // Handle recording completion (store locally, upload when submitting)
+  const handleRecordingComplete = (recordingData) => {
+    console.log('Recording completed:', { 
+      duration: recordingData.duration, 
+      transcript: recordingData.transcript?.substring(0, 100) + '...' 
+    });
+    
+    toast.success('Recording saved! Will be uploaded when you submit your answer.');
   };
 
-  const toggleRecording = () => {
-    // Voice recording functionality would go here
-    setIsRecording(!isRecording);
-    if (!isRecording) {
-      toast.success('Recording started (simulated)');
-    } else {
-      toast.success('Recording stopped (simulated)');
+  // Convert audio blob to base64
+  const convertBlobToBase64 = (blob) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const base64 = reader.result.split(',')[1]; // Remove data:audio/webm;base64, prefix
+        resolve(base64);
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  };
+
+  // Upload recording to database
+  const uploadRecording = async (recordingData) => {
+    if (!recordingData || !recordingData.audioBlob) {
+      return; // No recording to upload
+    }
+
+    try {
+      // Convert blob to base64
+      const base64Audio = await convertBlobToBase64(recordingData.audioBlob);
+      
+      const uploadData = {
+        session_id: sessionId,
+        question_index: session.current_question,
+        audio_data: base64Audio,
+        duration: recordingData.duration,
+        transcript: recordingData.transcript || '',
+        file_size: recordingData.audioBlob.size,
+        mime_type: recordingData.audioBlob.type || 'audio/webm'
+      };
+
+      const response = await interviewAPI.saveRecording(uploadData);
+      
+      if (response.success) {
+        console.log('Recording uploaded successfully:', response.recording_id);
+        toast.success('📹 Recording uploaded to database!');
+      } else {
+        throw new Error('Upload failed');
+      }
+    } catch (error) {
+      console.error('Error uploading recording:', error);
+      toast.error('Failed to upload recording, but answer was submitted successfully');
     }
   };
 
@@ -160,26 +212,27 @@ const InterviewSession = () => {
             placeholder="Type your answer here... Be specific and provide examples where possible."
             value={currentAnswer}
             onChange={(e) => setCurrentAnswer(e.target.value)}
-            disabled={submitting}
-          />
+            disabled={submitting}          />
+          
+          {/* Enhanced Live Speech - Transcription + Recording */}
+          <div className="mt-4">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              🎤 Enhanced Live Speech (Real-time Transcription + Recording)
+            </label>            <EnhancedLiveSpeech
+              ref={enhancedLiveSpeechRef}
+              onTranscriptionUpdate={handleTranscriptionUpdate}
+              onRecordingComplete={handleRecordingComplete}
+              disabled={submitting}
+              className="bg-gray-50 p-4 rounded-lg border border-gray-200"
+            /><p className="text-xs text-gray-500 mt-2">
+              Start speaking to see real-time transcription AND automatically record your speech for playback later.
+            </p>            <div className="text-sm text-gray-600 mt-1">
+              Character count: {currentAnswer.length}
+            </div>
+          </div>
           
           {/* Action Buttons */}
-          <div className="flex justify-between items-center">
-            <div className="flex items-center space-x-2">              <button
-                onClick={toggleRecording}
-                className={`btn-secondary flex items-center space-x-2 ${
-                  isRecording 
-                    ? '!bg-red-100 !text-red-700 hover:!bg-red-200' 
-                    : ''
-                }`}
-              >
-                {isRecording ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
-                <span>{isRecording ? 'Stop Recording' : 'Voice Input'}</span>
-              </button>
-              <span className="text-sm text-gray-500">
-                {currentAnswer.length} characters
-              </span>
-            </div>
+          <div className="flex justify-between items-center mt-4">
             
             <button
               onClick={submitAnswer}

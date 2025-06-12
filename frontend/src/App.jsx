@@ -11,6 +11,9 @@ import InterviewSession from './pages/InterviewSession';
 import Results from './pages/Results';
 import Dashboard from './pages/Dashboard';
 import FormDemo from './pages/FormDemo';
+import VoiceRecordingDemo from './pages/VoiceRecordingDemo';
+import VoiceTranscriptionTest from './pages/VoiceTranscriptionTest';
+import SimplifiedVoiceDemo from './pages/SimplifiedVoiceDemo';
 
 function App() {
   return (
@@ -21,6 +24,9 @@ function App() {
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/forms-demo" element={<FormDemo />} />
+            <Route path="/voice-demo" element={<VoiceRecordingDemo />} />
+            <Route path="/voice-test" element={<VoiceTranscriptionTest />} />
+            <Route path="/voice-simple" element={<SimplifiedVoiceDemo />} />
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<Signup />} />
             <Route path="/interview" element={

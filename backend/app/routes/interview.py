@@ -370,3 +370,99 @@ async def get_user_stats(current_user: User = Depends(get_current_user)):
             status_code=500,
             detail=f"Error getting user stats: {str(e)}"
         )
+
+@router.post("/save-recording")
+async def save_recording(request: dict, current_user: User = Depends(get_current_user)):
+    """Save audio recording for an interview session"""
+    
+    if not interview_service:
+        raise HTTPException(
+            status_code=500,
+            detail="Interview service not available."
+        )
+    try:
+        session_id = request.get('session_id')
+        question_index = request.get('question_index')
+        audio_data = request.get('audio_data')  # Base64 encoded
+        duration = request.get('duration')
+        transcript = request.get('transcript', '')
+        file_size = request.get('file_size')
+        mime_type = request.get('mime_type', 'audio/webm')
+        
+        if not all([session_id, question_index is not None, audio_data, duration, file_size]):
+            raise HTTPException(
+                status_code=400,
+                detail="session_id, question_index, audio_data, duration, and file_size are required"
+            )
+        
+        # Validate session exists and belongs to user
+        session = await interview_service.get_session(session_id, str(current_user.id))
+        if not session:
+            raise HTTPException(status_code=404, detail="Interview session not found")
+        
+        if str(session.user_id) != str(current_user.id):
+            raise HTTPException(status_code=403, detail="Access denied")
+        
+        # Save recording
+        recording_data = {
+            'user_id': current_user.id,
+            'session_id': session_id,
+            'question_index': question_index,
+            'audio_data': audio_data,
+            'duration': duration,
+            'transcript': transcript,
+            'file_size': file_size,
+            'mime_type': mime_type,
+            'created_at': datetime.now()
+        }
+        
+        recording_id = await interview_service.save_recording(recording_data)
+        
+        return {
+            "success": True,
+            "recording_id": str(recording_id),
+            "message": "Recording saved successfully"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error saving recording: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error saving recording: {str(e)}"
+        )
+
+@router.get("/recordings/{session_id}")
+async def get_session_recordings(session_id: str, current_user: User = Depends(get_current_user)):
+    """Get all recordings for a specific interview session"""
+    if not interview_service:
+        raise HTTPException(
+            status_code=500,
+            detail="Interview service not available."
+        )
+    
+    try:
+        # Validate session exists and belongs to user
+        session = await interview_service.get_session(session_id, str(current_user.id))
+        if not session:
+            raise HTTPException(status_code=404, detail="Interview session not found")
+        
+        if str(session.user_id) != str(current_user.id):
+            raise HTTPException(status_code=403, detail="Access denied")
+        
+        recordings = await interview_service.get_session_recordings(session_id)
+        
+        return {
+            "success": True,
+            "recordings": recordings
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting recordings: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error getting recordings: {str(e)}"
+        )

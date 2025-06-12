@@ -155,6 +155,43 @@ const Home = () => {
           <ArrowRight className="h-5 w-5" />
         </Link>
       </section>
+
+      {/* Developer Section */}
+      <section className="border-t border-gray-200 pt-8 mt-12">
+        <div className="text-center space-y-4 mb-6">
+          <h3 className="text-lg font-semibold text-gray-800">🛠️ Development & Testing</h3>
+          <p className="text-gray-600 text-sm max-w-xl mx-auto">
+            Test and explore the latest features during development
+          </p>
+        </div>
+        
+        <div className="flex flex-wrap justify-center gap-4">
+          <Link
+            to="/forms-demo"
+            className="px-4 py-2 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-lg text-sm font-medium transition-colors"
+          >
+            Enhanced Forms Demo
+          </Link>
+          <Link
+            to="/voice-demo"
+            className="px-4 py-2 bg-green-100 hover:bg-green-200 text-green-700 rounded-lg text-sm font-medium transition-colors"
+          >
+            Voice Recording Demo
+          </Link>
+          <Link
+            to="/voice-test"
+            className="px-4 py-2 bg-purple-100 hover:bg-purple-200 text-purple-700 rounded-lg text-sm font-medium transition-colors"
+          >
+            🎤 Voice Transcription Test
+          </Link>
+          <Link
+            to="/voice-simple"
+            className="px-4 py-2 bg-indigo-100 hover:bg-indigo-200 text-indigo-700 rounded-lg text-sm font-medium transition-colors"
+          >
+            ✨ Simplified Voice Demo
+          </Link>
+        </div>
+      </section>
     </div>
   );
 };

@@ -116,3 +116,30 @@ class JobDescription(BaseModel):
     responsibilities: List[str]
     skills_required: List[str]
     raw_text: str
+
+class InterviewRecording(BaseModel):
+    id: Optional[PyObjectId] = Field(default_factory=PyObjectId, alias="_id")
+    user_id: PyObjectId
+    session_id: str  # Keep as string since we use UUIDs for session IDs
+    question_index: int
+    audio_data: str  # Base64 encoded audio
+    duration: float  # Duration in seconds
+    transcript: Optional[str] = None
+    file_size: int
+    mime_type: str
+    created_at: datetime
+    
+    model_config = ConfigDict(
+        populate_by_name=True,
+        arbitrary_types_allowed=True,
+        json_encoders={ObjectId: str}
+    )
+
+class SaveRecordingRequest(BaseModel):
+    session_id: str
+    question_index: int
+    audio_data: str  # Base64 encoded
+    duration: float
+    transcript: Optional[str] = None
+    file_size: int
+    mime_type: str = "audio/webm"
