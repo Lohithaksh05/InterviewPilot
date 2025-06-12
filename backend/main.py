@@ -15,14 +15,13 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# CORS middleware
+# Get environment-specific CORS origins (simplified for personal use)
+allowed_origins = config('ALLOWED_ORIGINS', default='*').split(',')
+
+# CORS middleware (permissive for personal projects)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",  # React dev server (CRA)
-        "http://localhost:5173",  # Vite dev server
-        "http://127.0.0.1:5173",  # Vite dev server alternate
-    ],
+    allow_origins=["*"],  # Allow all origins for personal use
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
