@@ -4,9 +4,17 @@ from fastapi.staticfiles import StaticFiles
 import uvicorn
 from app.routes import interview, agents, resume, auth
 from app.services.gemini_service import GeminiService
-from app.database.mongodb import connect_to_mongo, close_mongo_connection
 from decouple import config
 import os
+
+# Import MongoDB connection based on environment
+is_render = os.getenv('RENDER') or config('PORT', default='8000') == '10000'
+if is_render:
+    print("DEBUG: Using Render-optimized MongoDB connection...")
+    from app.database.mongodb_render import connect_to_mongo, close_mongo_connection
+else:
+    print("DEBUG: Using standard MongoDB connection...")
+    from app.database.mongodb import connect_to_mongo, close_mongo_connection
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -51,4 +59,15 @@ async def health_check():
     return {"status": "healthy"}
 
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    # Get port from environment variable (Render uses PORT=10000)
+    port = int(config('PORT', default='8000'))
+    host = config('HOST', default='0.0.0.0')
+    debug = config('DEBUG', default=True, cast=bool)
+    
+    print(f"DEBUG: Starting server on {host}:{port}")
+    uvicorn.run(
+        "main:app", 
+        host=host, 
+        port=port, 
+        reload=debug
+    )
