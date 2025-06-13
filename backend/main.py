@@ -2,7 +2,7 @@ from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 import uvicorn
-from app.routes import interview, agents, resume, auth
+from app.routes import interview, agents, resume, auth, debug
 from app.services.gemini_service import GeminiService
 from decouple import config
 import os
@@ -40,9 +40,6 @@ app.include_router(auth.router, prefix="/api/auth", tags=["authentication"])
 app.include_router(interview.router, prefix="/api/interview", tags=["interview"])
 app.include_router(agents.router, prefix="/api/agents", tags=["agents"])
 app.include_router(resume.router, prefix="/api/resume", tags=["resume"])
-
-# Debug router (remove in production)
-from app.routes import debug
 app.include_router(debug.router, prefix="/api/debug", tags=["debug"])
 
 # Database event handlers
