@@ -1,5 +1,4 @@
 from fastapi import APIRouter, HTTPException
-from ..database.mongodb import get_database, is_connected, MongoDB
 import logging
 import os
 from decouple import config
@@ -11,9 +10,16 @@ router = APIRouter()
 async def debug_mongodb():
     """Debug endpoint to test MongoDB connection"""
     try:
-        # Check environment
+        # Check environment and import the correct MongoDB module
         is_render = os.getenv('RENDER') or config('PORT', default='8000') == '10000'
         mongodb_url = config("MONGODB_URL", default="mongodb://localhost:27017/interviewpilot")
+        
+        if is_render:
+            from ..database.mongodb_render import MongoDB, get_database, is_connected
+            env_name = "render"
+        else:
+            from ..database.mongodb import MongoDB, get_database, is_connected
+            env_name = "local"
         
         # Mask password in URL for security
         masked_url = mongodb_url
@@ -26,7 +32,7 @@ async def debug_mongodb():
                     masked_url = mongodb_url.replace(password, '***')
         
         debug_info = {
-            "environment": "render" if is_render else "local",
+            "environment": env_name,
             "mongodb_url": masked_url,
             "client_exists": MongoDB.client is not None,
             "database_exists": MongoDB.database is not None,
@@ -38,7 +44,8 @@ async def debug_mongodb():
             return {
                 "status": "error", 
                 "message": "MongoDB client not initialized",
-                "debug_info": debug_info
+                "debug_info": debug_info,
+                "solution": "Check startup logs for MongoDB connection errors"
             }
         
         # Check if database exists
@@ -46,7 +53,8 @@ async def debug_mongodb():
             return {
                 "status": "error", 
                 "message": "MongoDB database instance is None",
-                "debug_info": debug_info
+                "debug_info": debug_info,
+                "solution": "Database not set after client initialization"
             }
         
         # Try to ping the database
