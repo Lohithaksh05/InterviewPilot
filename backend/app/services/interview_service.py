@@ -1,8 +1,7 @@
 from typing import List, Optional, Dict, Any
 from datetime import datetime
-from ..database import get_database
+from ..database import get_database, is_connected
 from ..database.memory_db import memory_db
-from ..database.mongodb import is_connected
 from ..models.interview_models import InterviewSession, InterviewSummary
 from ..models.user_models import User
 import uuid
@@ -22,11 +21,11 @@ class InterviewService:
             id=session_id,  # Set the MongoDB _id to the same value as session_id
             session_id=session_id,
             user_id=str(user.id),
-            interviewer_type=session_data["interviewer_type"],
-            difficulty=session_data["difficulty"],
+            interviewer_type=session_data["interviewer_type"],            difficulty=session_data["difficulty"],
             job_description=session_data["job_description"],
             resume_text=session_data["resume_text"],
-            questions=session_data.get("questions", []),            created_at=datetime.utcnow(),
+            questions=session_data.get("questions", []),
+            created_at=datetime.utcnow(),
             updated_at=datetime.utcnow()
         )
         
@@ -37,14 +36,22 @@ class InterviewService:
                 sessions_collection = db.interview_sessions
                 session_dict = session.dict(by_alias=True)
                 result = await sessions_collection.insert_one(session_dict)
-                logger.info(f"Created session {session_id} in MongoDB")
+                
+                # Verify the session was actually saved
+                saved_session = await sessions_collection.find_one({"session_id": session_id})
+                if saved_session:
+                    logger.info(f"Session {session_id} successfully saved to MongoDB")
+                else:
+                    logger.error(f"Session {session_id} failed to save to MongoDB - falling back to memory")
+                    raise Exception("MongoDB save verification failed")
             else:
+                logger.warning("MongoDB not connected - using memory database")
                 # Use in-memory database
                 session_dict = session.dict()
                 memory_db.create_session(session_dict)
                 logger.info(f"Created session {session_id} in memory database")
         except Exception as e:
-            logger.error(f"Error creating session: {str(e)}")
+            logger.error(f"Error creating session in MongoDB: {str(e)}")
             # Fallback to memory database
             session_dict = session.dict()
             memory_db.create_session(session_dict)

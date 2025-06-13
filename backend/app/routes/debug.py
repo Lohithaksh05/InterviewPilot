@@ -173,7 +173,12 @@ async def test_session_creation(current_user: User = Depends(get_current_user)):
 async def test_session_creation(current_user: User = Depends(get_current_user)):
     """Debug endpoint to test session creation"""
     try:
+        from ..database import is_connected, get_database
         interview_service = InterviewService()
+        
+        # Check MongoDB connection status
+        mongodb_connected = is_connected()
+        logger.info(f"MongoDB connection status: {mongodb_connected}")
         
         # Create a test session
         test_session_data = {
@@ -189,12 +194,25 @@ async def test_session_creation(current_user: User = Depends(get_current_user)):
         # Verify the session was created by trying to retrieve it
         retrieved_session = await interview_service.get_session(session.session_id, str(current_user.id))
         
+        # If MongoDB is connected, also check if session exists in database
+        database_check = None
+        if mongodb_connected:
+            try:
+                db = get_database()
+                sessions_collection = db.interview_sessions
+                db_session = await sessions_collection.find_one({"session_id": session.session_id})
+                database_check = db_session is not None
+            except Exception as e:
+                database_check = f"Error: {str(e)}"
+        
         return {
             "status": "success",
             "message": "Test session created and verified",
+            "mongodb_connected": mongodb_connected,
             "session_id": session.session_id,
             "user_id": str(current_user.id),
-            "retrieved": retrieved_session is not None,
+            "retrieved_via_service": retrieved_session is not None,
+            "exists_in_database": database_check,
             "session_data": {
                 "interviewer_type": session.interviewer_type,
                 "difficulty": session.difficulty,
