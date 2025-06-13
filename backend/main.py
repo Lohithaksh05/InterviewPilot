@@ -30,10 +30,16 @@ app = FastAPI(
 # Get environment-specific CORS origins (simplified for personal use)
 allowed_origins = config('ALLOWED_ORIGINS', default='*').split(',')
 
-# CORS middleware (permissive for personal projects)
+# CORS middleware - Allow both development and production origins
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins for personal use
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173", 
+        "https://interviewpilot-ruddy.vercel.app",
+        "https://*.vercel.app",
+        "*"  # Fallback for any other origins
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

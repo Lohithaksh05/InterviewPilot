@@ -6,6 +6,16 @@ from decouple import config
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
+@router.get("/cors-test")
+async def cors_test():
+    """Simple endpoint to test CORS from frontend"""
+    return {
+        "status": "success",
+        "message": "CORS is working!",
+        "timestamp": "2025-06-13",
+        "backend_url": "https://interviewpilot.onrender.com"
+    }
+
 @router.get("/mongodb")
 async def debug_mongodb():
     """Debug endpoint to test MongoDB connection"""
