@@ -1,7 +1,10 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 import logging
 import os
 from decouple import config
+from ..services.auth_service import get_current_user
+from ..models.user_models import User
+from ..services.interview_service import InterviewService
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -106,3 +109,99 @@ async def debug_mongodb():
             "message": f"Debug endpoint error: {str(e)}",
             "debug_info": {"error": str(e)}
         }
+
+@router.get("/test-session-creation")
+async def test_session_creation(current_user: User = Depends(get_current_user)):
+    """Test session creation to debug database storage issues"""
+    try:
+        interview_service = InterviewService()
+        
+        # Test session data
+        session_data = {
+            "interviewer_type": "hr",
+            "difficulty": "medium",
+            "job_description": "Test job description",
+            "resume_text": "Test resume",
+            "questions": ["Test question 1", "Test question 2"]
+        }
+        
+        # Create session
+        session = await interview_service.create_session(current_user, session_data)
+        
+        # Try to retrieve the session to verify it was saved
+        retrieved_session = await interview_service.get_session(session.session_id, str(current_user.id))
+        
+        # Check database connection
+        is_render = os.getenv('RENDER') or config('PORT', default='8000') == '10000'
+        if is_render:
+            from ..database.mongodb_render import get_database, is_connected
+        else:
+            from ..database.mongodb import get_database, is_connected
+            
+        db_connected = is_connected()
+        
+        if db_connected:
+            db = get_database()
+            sessions_collection = db.interview_sessions
+            # Count total sessions for this user
+            session_count = await sessions_collection.count_documents({"user_id": str(current_user.id)})
+        else:
+            session_count = 0
+        
+        return {
+            "status": "success",
+            "created_session": {
+                "session_id": session.session_id,
+                "user_id": session.user_id,
+                "interviewer_type": session.interviewer_type
+            },
+            "retrieved_session_exists": retrieved_session is not None,
+            "database_connected": db_connected,
+            "total_sessions_for_user": session_count,
+            "user_id": str(current_user.id)
+        }
+        
+    except Exception as e:
+        logger.error(f"Error in test session creation: {str(e)}")
+        return {
+            "status": "error",
+            "error": str(e),
+            "user_id": str(current_user.id) if current_user else "no_user"
+        }
+
+@router.post("/test-session")
+async def test_session_creation(current_user: User = Depends(get_current_user)):
+    """Debug endpoint to test session creation"""
+    try:
+        interview_service = InterviewService()
+        
+        # Create a test session
+        test_session_data = {
+            "interviewer_type": "hr",
+            "difficulty": "easy",
+            "job_description": "Debug test job description",
+            "resume_text": "Debug test resume text",
+            "questions": ["Test question 1", "Test question 2"]
+        }
+        
+        session = await interview_service.create_session(current_user, test_session_data)
+        
+        # Verify the session was created by trying to retrieve it
+        retrieved_session = await interview_service.get_session(session.session_id, str(current_user.id))
+        
+        return {
+            "status": "success",
+            "message": "Test session created and verified",
+            "session_id": session.session_id,
+            "user_id": str(current_user.id),
+            "retrieved": retrieved_session is not None,
+            "session_data": {
+                "interviewer_type": session.interviewer_type,
+                "difficulty": session.difficulty,
+                "questions_count": len(session.questions)
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"Error creating test session: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Session creation failed: {str(e)}")

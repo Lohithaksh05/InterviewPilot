@@ -31,18 +31,14 @@ const Results = () => {
     } finally {
       setLoading(false);
     }
-  }, [sessionId, navigate]);  const fetchRecordings = useCallback(async () => {
-    try {
+  }, [sessionId, navigate]);  const fetchRecordings = useCallback(async () => {    try {
       setAudioLoading(true);
       const response = await interviewAPI.getSessionRecordings(sessionId);
-      console.log('Fetched recordings metadata:', response);
       
       // Handle the response format from backend: { success: true, recordings: [...] }
       const recordingsArray = response.recordings || response || [];
       
       if (Array.isArray(recordingsArray) && recordingsArray.length > 0) {
-        console.log(`Found ${recordingsArray.length} recordings, fetching audio data...`);
-        
         // Fetch audio data for each recording
         const recordingsWithAudio = {};
         
@@ -52,24 +48,15 @@ const Results = () => {
               const recordingId = recording.recording_id || recording._id;
               const audioResponse = await interviewAPI.getRecording(recordingId);
               const recordingWithAudio = audioResponse.recording || audioResponse;
-              
-              if (recordingWithAudio && recordingWithAudio.audio_data) {
+                if (recordingWithAudio && recordingWithAudio.audio_data) {
                 recordingsWithAudio[recording.question_index] = recordingWithAudio;
-                console.log(`Audio data loaded for question ${recording.question_index}`);
               }
             } catch (audioError) {
               console.warn(`Failed to fetch audio for recording ${recording.recording_id}:`, audioError);
             }
-          }
-        }
-        
+          }        }
         setRecordings(recordingsWithAudio);
-        
-        if (Object.keys(recordingsWithAudio).length > 0) {
-          toast.success(`🎵 Loaded audio for ${Object.keys(recordingsWithAudio).length} question(s)`);
-        }
       } else {
-        console.log('No recordings found for this session');
         setRecordings({});
       }
     } catch (error) {
@@ -92,10 +79,8 @@ const Results = () => {
       for (let i = 0; i < binaryString.length; i++) {
         bytes[i] = binaryString.charCodeAt(i);
       }
-      
-      // Use the recording's MIME type, default to audio/webm
+        // Use the recording's MIME type, default to audio/webm
       const mimeType = recording.mime_type || 'audio/webm';
-      console.log('Creating audio with MIME type:', mimeType);
       const blob = new Blob([bytes], { type: mimeType });
       return URL.createObjectURL(blob);
     } catch (error) {

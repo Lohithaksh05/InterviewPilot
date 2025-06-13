@@ -84,17 +84,11 @@ const InterviewSession = () => {
       setSubmitting(false);
     }  };
   // Handle enhanced live speech transcription
-  const handleTranscriptionUpdate = (text) => {
-    setCurrentAnswer(text);
+  const handleTranscriptionUpdate = (text) => {    setCurrentAnswer(text);
   };
-  // Handle recording completion (store locally, upload when submitting)
-  const handleRecordingComplete = (recordingData) => {
-    console.log('Recording completed:', { 
-      duration: recordingData.duration, 
-      transcript: recordingData.transcript?.substring(0, 100) + '...' 
-    });
-    
-    toast.success('Recording saved! Will be uploaded when you submit your answer.');
+    // Handle recording completion (store locally, upload when submitting)
+  const handleRecordingComplete = () => {
+    // Recording data is handled by the recording component
   };
 
   // Convert audio blob to base64
@@ -113,16 +107,7 @@ const InterviewSession = () => {
   const uploadRecording = async (recordingData) => {
     if (!recordingData || !recordingData.audioBlob) {
       return; // No recording to upload
-    }
-
-    try {
-      console.log('Uploading recording data:', {
-        duration: recordingData.duration,
-        fileSize: recordingData.audioBlob.size,
-        mimeType: recordingData.audioBlob.type,
-        transcriptLength: recordingData.transcript?.length || 0
-      });
-
+    }    try {
       // Convert blob to base64
       const base64Audio = await convertBlobToBase64(recordingData.audioBlob);
       
@@ -131,36 +116,18 @@ const InterviewSession = () => {
         question_index: session.current_question,
         audio_data: base64Audio,
         duration: Number(recordingData.duration) || 0, // Ensure it's a number
-        transcript: recordingData.transcript || '',
-        file_size: Number(recordingData.audioBlob.size) || 0, // Ensure it's a number
+        transcript: recordingData.transcript || '',        file_size: Number(recordingData.audioBlob.size) || 0, // Ensure it's a number
         mime_type: recordingData.audioBlob.type || 'audio/webm'
       };
 
-      console.log('Sending upload data:', {
-        ...uploadData,
-        audio_data: `[${uploadData.audio_data.length} chars]` // Don't log the full audio data
-      });
-
       const response = await interviewAPI.saveRecording(uploadData);
       
-      if (response.success) {
-        console.log('Recording uploaded successfully:', response.recording_id);
-        toast.success('📹 Recording uploaded to database!');
-      } else {
+      if (!response.success) {
         throw new Error('Upload failed');
       }
     } catch (error) {
       console.error('Error uploading recording:', error);
-      // More specific error messages
-      if (error.response?.status === 400) {
-        toast.error('❌ Recording data invalid - check required fields');
-      } else if (error.response?.status === 403) {
-        toast.error('❌ Access denied - session not authorized');
-      } else if (error.response?.status === 404) {
-        toast.error('❌ Session not found');
-      } else {
-        toast.error('❌ Failed to upload recording, but answer was submitted successfully');
-      }
+      // Recording upload errors are not critical for the interview flow
     }
   };
 
