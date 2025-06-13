@@ -347,7 +347,7 @@ Recommendation: ${summary?.overall_summary?.recommendation || 'N/A'}
                   {recording && recording.audio_data ? (
                     <div className="mt-3 border border-green-200 rounded-lg p-4 bg-green-50">
                       <div className="flex items-center space-x-2 mb-3">
-                        <span className="text-green-700 text-sm font-medium">🎤 Voice Recording Available</span>
+                        <span className="text-green-700 text-sm font-medium">🎤 Voice Recording</span>
                       </div>
                       <audio 
                         controls 
@@ -371,7 +371,7 @@ Recommendation: ${summary?.overall_summary?.recommendation || 'N/A'}
                           download={`question-${index + 1}-recording.wav`}
                           className="text-blue-600 hover:text-blue-800 underline"
                         >
-                          Download
+                          <Download className="h-4 w-4" />
                         </a>
                       </div>
                     </div>

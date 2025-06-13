@@ -156,15 +156,6 @@ const Home = () => {
         </Link>
       </section>
 
-      {/* Developer Section */}
-      <section className="border-t border-gray-200 pt-8 mt-12">
-        <div className="text-center space-y-4 mb-6">
-          <h3 className="text-lg font-semibold text-gray-800">🛠️ Development & Testing</h3>
-          <p className="text-gray-600 text-sm max-w-xl mx-auto">
-            Test and explore the latest features during development
-          </p>
-        </div>
-      </section>
     </div>
   );
 };

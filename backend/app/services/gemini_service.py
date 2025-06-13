@@ -32,6 +32,8 @@ class GeminiService:
                                num_questions: int = 5) -> List[str]:
         """Generate interview questions based on resume, job description, and difficulty level"""
         
+        logger.info(f"Generating {num_questions} questions for {interviewer_type} interviewer (difficulty: {difficulty})")
+        
         difficulty_guidelines = {
             "easy": {
                 "hr": "Basic questions about background, motivation, and simple behavioral scenarios. Focus on straightforward experiences and clear yes/no situations.",
@@ -75,8 +77,7 @@ class GeminiService:
             - Conflict resolution and negotiation
             - Adaptability and change management
             - Decision-making and strategic thinking
-            
-            {difficulty_guidelines[difficulty]["behavioral"]}"""
+              {difficulty_guidelines[difficulty]["behavioral"]}"""
         }
         
         prompt = f"""
@@ -88,21 +89,147 @@ class GeminiService:
         JOB DESCRIPTION:
         {job_description}
         
-        Please generate exactly {num_questions} relevant interview questions. 
+        IMPORTANT: You MUST generate exactly {num_questions} interview questions. No more, no less.
+        
         Return the questions as a JSON array of strings.
         Example format: ["Question 1?", "Question 2?", "Question 3?"]
+        
+        Ensure each question:
+        1. Ends with a question mark
+        2. Is relevant to the role and candidate
+        3. Matches the {difficulty} difficulty level
+        4. Is unique and well-formed
+        
+        Generate exactly {num_questions} questions now.
         """
         
         try:
             response = await self.generate_content(prompt)
-            # Parse JSON response
-            questions = json.loads(response)
-            return questions if isinstance(questions, list) else [response]
-        except json.JSONDecodeError:
-            # Fallback: split by lines and clean up
-            lines = response.strip().split('\n')
-            questions = [line.strip() for line in lines if line.strip() and '?' in line]
-            return questions[:num_questions]
+            
+            # Try to parse as JSON first
+            try:
+                questions = json.loads(response.strip())
+                if isinstance(questions, list):
+                    # Ensure we have exactly the right number of questions
+                    if len(questions) >= num_questions:
+                        final_questions = questions[:num_questions]
+                        logger.info(f"Successfully generated {len(final_questions)} questions (JSON parsing)")
+                        return final_questions
+                    else:
+                        logger.warning(f"Generated only {len(questions)} questions, need {num_questions}. Generating additional...")
+                        # If we don't have enough, generate more
+                        return await self._ensure_question_count(questions, num_questions, resume_text, job_description, interviewer_type, difficulty)
+                else:
+                    raise json.JSONDecodeError("Not a list", response, 0)
+            except json.JSONDecodeError:
+                # Fallback: parse line by line and ensure count
+                questions = self._parse_questions_from_text(response)
+                if len(questions) >= num_questions:
+                    return questions[:num_questions]
+                else:
+                    return await self._ensure_question_count(questions, num_questions, resume_text, job_description, interviewer_type, difficulty)
+                    
+        except Exception as e:
+            logger.error(f"Error generating questions: {str(e)}")
+            # Last resort: return generic questions
+            return self._get_fallback_questions(interviewer_type, num_questions)
+    
+    def _parse_questions_from_text(self, text: str) -> List[str]:
+        """Parse questions from text response"""
+        lines = text.strip().split('\n')
+        questions = []
+        
+        for line in lines:
+            line = line.strip()
+            # Remove numbering, bullets, quotes
+            line = line.lstrip('0123456789.- "\'[]')
+            line = line.rstrip('"\'[]')
+            
+            if line and ('?' in line or len(line) > 10):  # Likely a question
+                if not line.endswith('?'):
+                    line += '?'
+                questions.append(line)
+        
+        return questions
+    
+    async def _ensure_question_count(self, existing_questions: List[str], target_count: int, 
+                                   resume_text: str, job_description: str, 
+                                   interviewer_type: str, difficulty: str) -> List[str]:
+        """Ensure we have exactly the target number of questions"""
+        logger.info(f"Ensuring question count: have {len(existing_questions)}, need {target_count}")
+        
+        if len(existing_questions) >= target_count:
+            final_questions = existing_questions[:target_count]
+            logger.info(f"Trimmed to {len(final_questions)} questions")
+            return final_questions
+        
+        needed = target_count - len(existing_questions)
+        logger.info(f"Need to generate {needed} additional questions")
+        
+        # Generate additional questions
+        additional_prompt = f"""
+        Generate exactly {needed} additional {interviewer_type} interview questions for this candidate.
+        Make them different from these existing questions: {existing_questions}
+        
+        Return as JSON array: ["Question 1?", "Question 2?"]
+        """
+        
+        try:
+            response = await self.generate_content(additional_prompt)
+            additional_questions = json.loads(response.strip())
+            if isinstance(additional_questions, list):
+                all_questions = existing_questions + additional_questions
+                return all_questions[:target_count]
+        except:
+            pass
+        
+        # If all else fails, use fallback questions
+        fallback = self._get_fallback_questions(interviewer_type, needed)
+        return (existing_questions + fallback)[:target_count]
+    
+    def _get_fallback_questions(self, interviewer_type: str, count: int) -> List[str]:
+        """Provide fallback questions if AI generation fails"""
+        fallback_questions = {
+            "hr": [
+                "Tell me about yourself and your professional background?",
+                "Why are you interested in this position?",
+                "How do you handle challenges and pressure at work?",
+                "Describe your ideal work environment?",
+                "Where do you see yourself in the next 5 years?",
+                "What motivates you in your professional life?",
+                "How do you prioritize tasks when you have multiple deadlines?",
+                "Tell me about a time you worked effectively in a team?",
+                "What are your greatest strengths and weaknesses?",
+                "Why should we hire you for this role?"
+            ],
+            "tech_lead": [
+                "Explain your approach to system design and architecture?",
+                "How do you ensure code quality in your projects?",
+                "Describe a challenging technical problem you solved?",
+                "How do you stay updated with new technologies?",
+                "Explain your experience with debugging complex issues?",
+                "How do you handle performance optimization?",
+                "Describe your experience with version control and collaboration?",
+                "How do you approach testing and quality assurance?",
+                "Explain your understanding of scalable systems?",
+                "How do you mentor junior developers?"
+            ],
+            "behavioral": [
+                "Tell me about a time you overcame a significant challenge?",
+                "Describe a situation where you had to lead a team through change?",
+                "How do you handle conflicts with colleagues?",
+                "Tell me about a time you failed and what you learned?",
+                "Describe a situation where you had to make a difficult decision?",
+                "How do you handle feedback and criticism?",
+                "Tell me about a time you exceeded expectations?",
+                "Describe your experience working with difficult stakeholders?",
+                "How do you manage stress and maintain work-life balance?",
+                "Tell me about a time you had to learn something new quickly?"
+            ]
+        }
+        
+        questions = fallback_questions.get(interviewer_type, fallback_questions["hr"])
+        return questions[:count]
     
     async def evaluate_answer(self, 
                             question: str, 
