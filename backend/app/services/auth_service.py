@@ -12,9 +12,9 @@ import logging
 logger = logging.getLogger(__name__)
 
 # Configuration
-SECRET_KEY = config("SECRET_KEY", default="your-secret-key-here-change-in-production")
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
+SECRET_KEY = config("JWT_SECRET_KEY", default="your-secret-key-here-change-in-production")
+ALGORITHM = config("JWT_ALGORITHM", default="HS256")
+ACCESS_TOKEN_EXPIRE_MINUTES = int(config("ACCESS_TOKEN_EXPIRE_MINUTES", default="30"))
 
 # Password hashing
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
