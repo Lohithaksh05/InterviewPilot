@@ -212,6 +212,8 @@ const InterviewSession = () => {
               onTranscriptionUpdate={handleTranscriptionUpdate}
               onRecordingComplete={handleRecordingComplete}
               disabled={submitting}
+              sessionId={sessionId}
+              questionIndex={session?.current_question}
               className="bg-gray-50 p-4 rounded-lg border border-gray-200"
             /><p className="text-xs text-gray-500 mt-2">
               Start speaking to see real-time transcription AND automatically record your speech for playback later.

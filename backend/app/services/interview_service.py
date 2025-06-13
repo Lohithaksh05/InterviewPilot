@@ -181,30 +181,60 @@ class InterviewService:
                 sessions_data = memory_db.find_sessions_by_user(user_id)
                 return [InterviewSession(**session) for session in sessions_data]
         except Exception as e:
-            logger.error(f"Error getting user sessions: {str(e)}")
-            # Fallback to memory database
+            logger.error(f"Error getting user sessions: {str(e)}")            # Fallback to memory database
             sessions_data = memory_db.find_sessions_by_user(user_id)
             return [InterviewSession(**session) for session in sessions_data]
 
     async def delete_session(self, session_id: str, user_id: str) -> bool:
-        """Delete a session"""
+        """Delete a session and all its related recordings"""
         try:
             if is_connected():
                 # Use MongoDB
                 db = get_database()
                 sessions_collection = db.interview_sessions
+                recordings_collection = db.interview_recordings
                 
-                result = await sessions_collection.delete_one({
+                # First, delete all recordings associated with this session
+                recordings_result = await recordings_collection.delete_many({
+                    "session_id": session_id
+                })
+                logger.info(f"Deleted {recordings_result.deleted_count} recordings for session {session_id}")
+                
+                # Then delete the session itself
+                session_result = await sessions_collection.delete_one({
                     "session_id": session_id,
                     "user_id": user_id
                 })
-                return result.deleted_count > 0
+                
+                session_deleted = session_result.deleted_count > 0
+                if session_deleted:
+                    logger.info(f"Successfully deleted session {session_id} and {recordings_result.deleted_count} associated recordings")
+                else:
+                    logger.warning(f"Session {session_id} not found or not owned by user {user_id}")
+                
+                return session_deleted
             else:
                 # Use in-memory database
+                # Delete recordings from memory
+                if hasattr(memory_db, 'recordings'):
+                    recordings_to_delete = [rid for rid, rec in memory_db.recordings.items() 
+                                          if rec.get('session_id') == session_id]
+                    for rid in recordings_to_delete:
+                        del memory_db.recordings[rid]
+                    logger.info(f"Deleted {len(recordings_to_delete)} recordings from memory for session {session_id}")
+                
+                # Delete session from memory
                 return memory_db.delete_session(session_id, user_id)
         except Exception as e:
-            logger.error(f"Error deleting session: {str(e)}")
+            logger.error(f"Error deleting session and recordings: {str(e)}")
             # Fallback to memory database
+            # Delete recordings from memory
+            if hasattr(memory_db, 'recordings'):
+                recordings_to_delete = [rid for rid, rec in memory_db.recordings.items() 
+                                      if rec.get('session_id') == session_id]
+                for rid in recordings_to_delete:
+                    del memory_db.recordings[rid]
+            
             return memory_db.delete_session(session_id, user_id)
 
     async def get_user_stats(self, user_id: str) -> dict:
@@ -367,3 +397,23 @@ class InterviewService:
         except Exception as e:
             logger.error(f"Error getting recording {recording_id}: {str(e)}")
             return None
+
+    async def get_session_recordings_count(self, session_id: str) -> int:
+        """Get count of recordings for a session (for delete confirmation)"""
+        try:
+            if is_connected():
+                # Use MongoDB
+                db = get_database()
+                recordings_collection = db.interview_recordings
+                count = await recordings_collection.count_documents({"session_id": session_id})
+                return count
+            else:
+                # Use in-memory database
+                if hasattr(memory_db, 'recordings'):
+                    count = sum(1 for rec in memory_db.recordings.values() 
+                              if rec.get('session_id') == session_id)
+                    return count
+                return 0
+        except Exception as e:
+            logger.error(f"Error counting session recordings: {str(e)}")
+            return 0

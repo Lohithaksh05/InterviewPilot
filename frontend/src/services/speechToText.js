@@ -6,21 +6,38 @@ class SpeechToTextService {
     this.onResult = null;
     this.onError = null;
     this.onEnd = null;
+    this.supported = null; // Cache support check
+    
+    // Check support immediately on construction
+    this.checkSupport();
   }
 
   // Check if browser supports Web Speech API
   isSupported() {
-    return !!(
+    if (this.supported !== null) {
+      return this.supported;
+    }
+    return this.checkSupport();
+  }
+
+  // Check support and cache result
+  checkSupport() {
+    const hasWebSpeechAPI = !!(
       window.SpeechRecognition ||
       window.webkitSpeechRecognition ||
       window.mozSpeechRecognition ||
       window.msSpeechRecognition
     );
+    
+    const hasMediaDevices = !!(navigator.mediaDevices?.getUserMedia);
+    const hasMediaRecorder = !!(window.MediaRecorder);
+    
+    this.supported = hasWebSpeechAPI && hasMediaDevices && hasMediaRecorder;
+    return this.supported;
   }
-
   // Initialize speech recognition
   initialize() {
-    if (!this.isSupported()) {
+    if (!this.checkSupport()) {
       throw new Error('Speech recognition is not supported in this browser');
     }
 

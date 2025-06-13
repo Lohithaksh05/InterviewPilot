@@ -242,8 +242,7 @@ class GeminiService:
             "hr": "communication clarity, cultural fit, professional experience relevance",
             "tech_lead": "technical accuracy, problem-solving approach, depth of knowledge",
             "behavioral": "specific examples, leadership qualities, situational handling"
-        }
-        
+        }        
         prompt = f"""
         You are a {interviewer_type} interviewer evaluating a candidate's answer.
         
@@ -251,16 +250,34 @@ class GeminiService:
         CANDIDATE'S ANSWER: {answer}
         JOB DESCRIPTION: {job_description}
         
-        Evaluate the answer based on: {evaluation_criteria.get(interviewer_type, 'overall quality')}
+        IMPORTANT SCORING GUIDELINES:
+        - Score 0-1: Completely irrelevant, random text, no attempt to answer the question, nonsensical response
+        - Score 2-3: Partially relevant but mostly off-topic, very poor quality, missing key points
+        - Score 4-5: Somewhat relevant but lacks depth, basic answer with significant gaps
+        - Score 6-7: Good answer that addresses the question with some detail and relevance
+        - Score 8-9: Excellent answer with strong relevance, good examples, and comprehensive coverage
+        - Score 10: Outstanding answer that perfectly addresses the question with exceptional insight
+        
+        STRICT EVALUATION CRITERIA:
+        1. First check if the answer is actually attempting to respond to the question asked
+        2. If the answer is random text, gibberish, or completely unrelated - give 0 points
+        3. If the answer shows no understanding of the question - give 0-1 points
+        4. Only give higher scores if the answer demonstrates genuine effort and relevance
+        
+        Evaluate based on: {evaluation_criteria.get(interviewer_type, 'overall quality')}
+        
+        BE STRICT: Random typing, irrelevant responses, or non-answers should receive 0 points.
         
         Provide your evaluation in the following JSON format:
         {{
             "score": 0-10,
-            "feedback": "detailed feedback on the answer",
+            "feedback": "detailed feedback explaining why this score was given",
             "strengths": ["strength 1", "strength 2"],
             "improvements": ["improvement 1", "improvement 2"],
-            "follow_up_questions": ["follow up question 1", "follow up question 2"]
-        }}        """
+            "follow_up_questions": ["follow up question 1", "follow up question 2"],
+            "relevance_check": "Is this answer relevant to the question? (Yes/No)",
+            "reasoning": "Brief explanation of the scoring decision"
+        }}"""
         
         try:
             response = await self.generate_content(prompt)
@@ -276,36 +293,59 @@ class GeminiService:
                 evaluation = json.loads(response)
             
             # Ensure all required fields exist
-            if not isinstance(evaluation, dict):
-                raise json.JSONDecodeError("Invalid response format", "", 0)
-                
+            if not isinstance(evaluation, dict):                raise json.JSONDecodeError("Invalid response format", "", 0)
+            
             # Validate and set defaults for missing fields
-            evaluation.setdefault("score", 5)
+            evaluation.setdefault("score", 0)  # Default to 0 instead of 5 for failed parsing
             evaluation.setdefault("feedback", "No feedback provided")
             evaluation.setdefault("strengths", [])
-            evaluation.setdefault("improvements", [])
+            evaluation.setdefault("improvements", ["Answer should be more relevant to the question"])
             evaluation.setdefault("follow_up_questions", [])
+            evaluation.setdefault("relevance_check", "No")
+            evaluation.setdefault("reasoning", "Failed to parse evaluation properly")
             
             # Ensure score is within valid range
-            score = evaluation.get("score", 5)
+            score = evaluation.get("score", 0)
             if isinstance(score, str):
                 try:
                     score = float(score)
                 except (ValueError, TypeError):
-                    score = 5
+                    score = 0  # Default to 0 for parsing errors
             evaluation["score"] = max(0, min(10, score))
+            
+            # Additional check for obviously irrelevant answers
+            answer_lower = answer.lower().strip()
+            if (len(answer_lower) < 5 or 
+                answer_lower in ['test', 'testing', 'random', 'abc', 'xyz', 'asdf', 'qwerty'] or
+                all(c in 'abcdefghijklmnopqrstuvwxyz0123456789 ' for c in answer_lower) and len(set(answer_lower.replace(' ', ''))) <= 3):
+                evaluation["score"] = 0
+                evaluation["feedback"] = "Answer appears to be random text or not a genuine attempt to respond to the question."
+                evaluation["improvements"] = ["Please provide a relevant answer that addresses the question asked"]
+                evaluation["relevance_check"] = "No"
             
             return evaluation
             
         except (json.JSONDecodeError, ValueError, KeyError) as e:
             logger.error(f"Error parsing evaluation response: {str(e)}")
             logger.error(f"Raw response: {response}")
+            
+            # For parsing errors, be conservative and check if answer seems irrelevant
+            answer_lower = answer.lower().strip()
+            is_likely_random = (len(answer_lower) < 5 or 
+                              answer_lower in ['test', 'testing', 'random', 'abc', 'xyz', 'asdf', 'qwerty'] or
+                              (all(c in 'abcdefghijklmnopqrstuvwxyz0123456789 ' for c in answer_lower) and 
+                               len(set(answer_lower.replace(' ', ''))) <= 3))
+            
+            fallback_score = 0 if is_likely_random else 1
+            
             return {
-                "score": 5,
-                "feedback": f"Error parsing AI response: {response}",
-                "strengths": [],
-                "improvements": [],
-                "follow_up_questions": []
+                "score": fallback_score,
+                "feedback": f"Unable to properly evaluate this answer. {'Appears to be random text.' if is_likely_random else 'Please provide a more detailed response.'}",
+                "strengths": [] if is_likely_random else ["Attempted to provide an answer"],
+                "improvements": ["Please provide a relevant answer that clearly addresses the question asked"],
+                "follow_up_questions": [],
+                "relevance_check": "No" if is_likely_random else "Unclear",
+                "reasoning": "Evaluation parsing failed"
             }
     async def generate_interview_summary(self, 
                                        questions: List[str], 

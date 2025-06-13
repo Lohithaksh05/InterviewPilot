@@ -9,10 +9,12 @@ import {
   Download,
   Star,
   Target,
-  Lightbulb
+  Lightbulb,
+  FileText
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { interviewAPI } from '../services/api';
+import jsPDF from 'jspdf';
 
 const Results = () => {
   const { sessionId } = useParams();
@@ -106,10 +108,181 @@ const Results = () => {
     if (score >= 6) return 'bg-yellow-100';
     return 'bg-red-100';
   };
-
-  const downloadReport = () => {
-    // Create a simple text report
-    const report = `
+  const downloadReport = async () => {
+    try {
+      const pdf = new jsPDF();
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      let yPosition = 20;
+      
+      // Helper function to add text with word wrapping
+      const addTextWithWrap = (text, y, fontSize = 12, fontStyle = 'normal') => {
+        pdf.setFontSize(fontSize);
+        pdf.setFont('helvetica', fontStyle);
+        
+        const lines = pdf.splitTextToSize(text, pageWidth - 40);
+        lines.forEach((line, index) => {
+          if (y + (index * 7) > pageHeight - 20) {
+            pdf.addPage();
+            y = 20;
+          }
+          pdf.text(line, 20, y + (index * 7));
+        });
+        
+        return y + (lines.length * 7) + 5;
+      };
+      
+      // Header
+      pdf.setFillColor(59, 130, 246); // Blue
+      pdf.rect(0, 0, pageWidth, 30, 'F');
+      pdf.setTextColor(255, 255, 255);
+      pdf.setFontSize(24);
+      pdf.setFont('helvetica', 'bold');
+      pdf.text('InterviewPilot Report', 20, 20);
+      
+      // Reset text color
+      pdf.setTextColor(0, 0, 0);
+      yPosition = 40;
+      
+      // Session Info
+      yPosition = addTextWithWrap(`Session ID: ${sessionId}`, yPosition, 12, 'normal');
+      yPosition = addTextWithWrap(`Interviewer Type: ${summary?.interviewer_type?.replace('_', ' ').toUpperCase()}`, yPosition, 12, 'normal');
+      yPosition = addTextWithWrap(`Date: ${new Date().toLocaleDateString()}`, yPosition, 12, 'normal');
+      yPosition = addTextWithWrap(`Questions Answered: ${summary?.answered_questions}`, yPosition, 12, 'normal');
+      yPosition += 10;
+      
+      // Overall Score Section
+      pdf.setFillColor(240, 240, 240);
+      pdf.rect(15, yPosition, pageWidth - 30, 30, 'F');
+      pdf.setTextColor(0, 0, 0);
+      yPosition = addTextWithWrap('OVERALL PERFORMANCE', yPosition + 10, 16, 'bold');
+      yPosition = addTextWithWrap(`Score: ${summary?.average_score}/10`, yPosition, 14, 'bold');
+      yPosition += 10;
+      
+      // Overall Summary
+      if (summary?.overall_summary?.summary) {
+        yPosition = addTextWithWrap('Interview Summary:', yPosition, 14, 'bold');
+        yPosition = addTextWithWrap(summary.overall_summary.summary, yPosition, 11, 'normal');
+        yPosition += 10;
+      }
+      
+      // Key Strengths
+      if (summary?.overall_summary?.key_strengths?.length > 0) {
+        yPosition = addTextWithWrap('Key Strengths:', yPosition, 14, 'bold');
+        summary.overall_summary.key_strengths.forEach(strength => {
+          yPosition = addTextWithWrap(`• ${strength}`, yPosition, 11, 'normal');
+        });
+        yPosition += 10;
+      }
+      
+      // Areas for Improvement
+      if (summary?.overall_summary?.areas_for_improvement?.length > 0) {
+        yPosition = addTextWithWrap('Areas for Improvement:', yPosition, 14, 'bold');
+        summary.overall_summary.areas_for_improvement.forEach(improvement => {
+          yPosition = addTextWithWrap(`• ${improvement}`, yPosition, 11, 'normal');
+        });
+        yPosition += 10;
+      }
+      
+      // Recommendation
+      if (summary?.overall_summary?.recommendation) {
+        yPosition = addTextWithWrap('Recommendation:', yPosition, 14, 'bold');
+        yPosition = addTextWithWrap(summary.overall_summary.recommendation, yPosition, 11, 'normal');
+        yPosition += 10;
+      }
+      
+      // Question-by-Question Analysis
+      if (summary?.qa_pairs?.length > 0) {
+        // Add new page for detailed analysis
+        pdf.addPage();
+        yPosition = 20;
+        
+        yPosition = addTextWithWrap('DETAILED QUESTION ANALYSIS', yPosition, 16, 'bold');
+        yPosition += 10;
+        
+        summary.qa_pairs.forEach((qa, index) => {
+          // Check if we need a new page
+          if (yPosition > pageHeight - 80) {
+            pdf.addPage();
+            yPosition = 20;
+          }
+          
+          // Question header
+          pdf.setFillColor(245, 245, 245);
+          pdf.rect(15, yPosition, pageWidth - 30, 20, 'F');
+          yPosition = addTextWithWrap(`Question ${index + 1} (Score: ${qa.feedback?.score || 'N/A'}/10)`, yPosition + 5, 12, 'bold');
+          yPosition += 5;
+          
+          // Question text
+          yPosition = addTextWithWrap(`Q: ${qa.question}`, yPosition, 11, 'bold');
+          yPosition += 3;
+          
+          // Answer text
+          yPosition = addTextWithWrap(`A: ${qa.answer}`, yPosition, 10, 'normal');
+          yPosition += 5;
+          
+          // Feedback
+          if (qa.feedback?.feedback) {
+            yPosition = addTextWithWrap(`Feedback: ${qa.feedback.feedback}`, yPosition, 10, 'italic');
+            yPosition += 5;
+          }
+          
+          // Strengths
+          if (qa.feedback?.strengths?.length > 0) {
+            yPosition = addTextWithWrap('Strengths:', yPosition, 10, 'bold');
+            qa.feedback.strengths.forEach(strength => {
+              yPosition = addTextWithWrap(`  ✓ ${strength}`, yPosition, 9, 'normal');
+            });
+          }
+          
+          // Improvements
+          if (qa.feedback?.improvements?.length > 0) {
+            yPosition = addTextWithWrap('Areas to Improve:', yPosition, 10, 'bold');
+            qa.feedback.improvements.forEach(improvement => {
+              yPosition = addTextWithWrap(`  💡 ${improvement}`, yPosition, 9, 'normal');
+            });
+          }
+          
+          yPosition += 15;
+        });
+      }
+      
+      // Next Steps
+      if (summary?.overall_summary?.next_steps?.length > 0) {
+        if (yPosition > pageHeight - 60) {
+          pdf.addPage();
+          yPosition = 20;
+        }
+        
+        yPosition = addTextWithWrap('RECOMMENDED NEXT STEPS', yPosition, 14, 'bold');
+        yPosition += 5;
+        
+        summary.overall_summary.next_steps.forEach(step => {
+          yPosition = addTextWithWrap(`→ ${step}`, yPosition, 11, 'normal');
+        });
+      }
+      
+      // Footer
+      const totalPages = pdf.internal.getNumberOfPages();
+      for (let i = 1; i <= totalPages; i++) {
+        pdf.setPage(i);
+        pdf.setFontSize(8);
+        pdf.setTextColor(128, 128, 128);
+        pdf.text(`Generated by InterviewPilot - Page ${i} of ${totalPages}`, 20, pageHeight - 10);
+        pdf.text(`Generated on ${new Date().toLocaleString()}`, pageWidth - 80, pageHeight - 10);
+      }
+      
+      // Save the PDF
+      const fileName = `interview-report-${sessionId}-${new Date().toISOString().slice(0, 10)}.pdf`;
+      pdf.save(fileName);
+      toast.success('PDF report downloaded successfully!');
+      
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      toast.error('Failed to generate PDF report');
+      
+      // Fallback to text report
+      const report = `
 Interview Results - InterviewPilot
 =====================================
 
@@ -137,19 +310,19 @@ Areas for Improvement:
 ${summary?.overall_summary?.areas_for_improvement?.map(s => `• ${s}`).join('\n') || 'N/A'}
 
 Recommendation: ${summary?.overall_summary?.recommendation || 'N/A'}
-    `.trim();
+      `.trim();
 
-    const blob = new Blob([report], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `interview-report-${sessionId}.txt`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    
-    toast.success('Report downloaded successfully!');
+      const blob = new Blob([report], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `interview-report-${sessionId}.txt`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast.success('Text report downloaded as fallback!');
+    }
   };
 
   if (loading) {
@@ -182,13 +355,12 @@ Recommendation: ${summary?.overall_summary?.recommendation || 'N/A'}
             {summary.interviewer_type.replace('_', ' ').toUpperCase()} Interview • {summary.answered_questions} questions answered
           </p>
         </div>
-        <div className="flex items-center space-x-3">
-          <button
+        <div className="flex items-center space-x-3">          <button
             onClick={downloadReport}
             className="btn-secondary flex items-center space-x-2"
           >
-            <Download className="h-4 w-4" />
-            <span>Download Report</span>
+            <FileText className="h-4 w-4" />
+            <span>Download PDF Report</span>
           </button>
           <Link to="/interview" className="btn-primary">
             New Interview

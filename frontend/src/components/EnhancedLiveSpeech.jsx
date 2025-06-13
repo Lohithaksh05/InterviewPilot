@@ -8,7 +8,9 @@ const EnhancedLiveSpeech = ({
   onTranscriptionUpdate, 
   onRecordingComplete, 
   disabled = false,
-  className = "" 
+  className = "",
+  sessionId = null,
+  questionIndex = null
 }) => {
   const [isActive, setIsActive] = useState(false);
   const [transcript, setTranscript] = useState('');
@@ -16,9 +18,10 @@ const EnhancedLiveSpeech = ({
   const [audioURL, setAudioURL] = useState(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [duration, setDuration] = useState(0);
-  const [currentTime, setCurrentTime] = useState(0);
-  const [audioDuration, setAudioDuration] = useState(0);
-  const [lastRecordingData, setLastRecordingData] = useState(null);
+  const [currentTime, setCurrentTime] = useState(0);  const [audioDuration, setAudioDuration] = useState(0);
+  const [isServiceReady, setIsServiceReady] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadSuccess, setUploadSuccess] = useState(false);
   
   // Refs
   const speechServiceRef = useRef(null);
@@ -27,10 +30,25 @@ const EnhancedLiveSpeech = ({
   const streamRef = useRef(null);
   const timerRef = useRef(null);
   const startTimeRef = useRef(null);
-  const audioElementRef = useRef(null);
-  // Initialize speech service
+  const audioElementRef = useRef(null);  // Initialize speech service
   useEffect(() => {
-    speechServiceRef.current = new SpeechToTextService();
+    const initializeService = async () => {
+      try {
+        speechServiceRef.current = new SpeechToTextService();
+        // Check if the service supports speech recognition immediately
+        const isSupported = speechServiceRef.current.isSupported();
+        setIsServiceReady(isSupported);
+        
+        if (!isSupported) {
+          console.warn('Speech recognition not supported in this browser');
+        }
+      } catch (error) {
+        console.error('Failed to initialize speech service:', error);
+        setIsServiceReady(false);
+      }
+    };
+    
+    initializeService();
     
     return () => {
       if (speechServiceRef.current) {
@@ -51,7 +69,8 @@ const EnhancedLiveSpeech = ({
       if (audioURL) {
         URL.revokeObjectURL(audioURL);
       }
-    };  }, [audioURL]);
+    };
+  }, [audioURL]);
 
   // Convert audio blob to base64
   const convertBlobToBase64 = (blob) => {
@@ -103,10 +122,10 @@ const EnhancedLiveSpeech = ({
       setIsUploading(false);
     }
   };
-
   // Check if browser supports required features
   const isSupported = () => {
     return !!(
+      isServiceReady &&
       speechServiceRef.current?.isSupported() &&
       navigator.mediaDevices?.getUserMedia &&
       window.MediaRecorder
