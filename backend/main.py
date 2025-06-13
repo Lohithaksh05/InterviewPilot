@@ -2,7 +2,11 @@ from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 import uvicorn
-from app.routes import interview, agents, resume, auth, debug
+from app.routes.interview import router as interview_router
+from app.routes.agents import router as agents_router
+from app.routes.resume import router as resume_router
+from app.routes.auth import router as auth_router
+from app.routes.debug import router as debug_router
 from app.services.gemini_service import GeminiService
 from decouple import config
 import os
@@ -36,11 +40,11 @@ app.add_middleware(
 )
 
 # Include routers
-app.include_router(auth.router, prefix="/api/auth", tags=["authentication"])
-app.include_router(interview.router, prefix="/api/interview", tags=["interview"])
-app.include_router(agents.router, prefix="/api/agents", tags=["agents"])
-app.include_router(resume.router, prefix="/api/resume", tags=["resume"])
-app.include_router(debug.router, prefix="/api/debug", tags=["debug"])
+app.include_router(auth_router, prefix="/api/auth", tags=["authentication"])
+app.include_router(interview_router, prefix="/api/interview", tags=["interview"])
+app.include_router(agents_router, prefix="/api/agents", tags=["agents"])
+app.include_router(resume_router, prefix="/api/resume", tags=["resume"])
+app.include_router(debug_router, prefix="/api/debug", tags=["debug"])
 
 # Database event handlers
 @app.on_event("startup")
