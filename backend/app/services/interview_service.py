@@ -19,6 +19,7 @@ class InterviewService:
         session_id = str(uuid.uuid4())
         
         session = InterviewSession(
+            id=session_id,  # Set the MongoDB _id to the same value as session_id
             session_id=session_id,
             user_id=str(user.id),
             interviewer_type=session_data["interviewer_type"],

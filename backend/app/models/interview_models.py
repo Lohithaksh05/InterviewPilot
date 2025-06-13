@@ -55,7 +55,7 @@ class InterviewSession(BaseModel):
         arbitrary_types_allowed=True,
         json_encoders={ObjectId: str}
     )
-    id: PyObjectId = Field(default_factory=PyObjectId, alias="_id")
+    id: Optional[str] = Field(default=None, alias="_id")  # Use string ID instead of ObjectId
     session_id: str
     user_id: str  # Reference to the user who owns this session
     interviewer_type: InterviewerType
@@ -119,7 +119,7 @@ class JobDescription(BaseModel):
 
 class InterviewRecording(BaseModel):
     recording_id: str = Field(alias="_id")  # Use custom string ID instead of ObjectId
-    user_id: PyObjectId
+    user_id: str  # Use string instead of PyObjectId for consistency
     session_id: str  # Keep as string since we use UUIDs for session IDs
     question_index: int
     audio_data: str  # Base64 encoded audio
