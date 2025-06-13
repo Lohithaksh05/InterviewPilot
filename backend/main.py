@@ -41,6 +41,10 @@ app.include_router(interview.router, prefix="/api/interview", tags=["interview"]
 app.include_router(agents.router, prefix="/api/agents", tags=["agents"])
 app.include_router(resume.router, prefix="/api/resume", tags=["resume"])
 
+# Debug router (remove in production)
+from app.routes import debug
+app.include_router(debug.router, prefix="/api/debug", tags=["debug"])
+
 # Database event handlers
 @app.on_event("startup")
 async def startup_event():
