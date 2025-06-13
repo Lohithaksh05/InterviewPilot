@@ -206,7 +206,7 @@ const InterviewSession = () => {
           {/* Enhanced Live Speech - Transcription + Recording */}
           <div className="mt-4">
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              🎤 Enhanced Live Speech (Real-time Transcription + Recording)
+              🎤 Live Speech (Real-time Transcription + Recording)
             </label>            <EnhancedLiveSpeech
               ref={enhancedLiveSpeechRef}
               onTranscriptionUpdate={handleTranscriptionUpdate}
