@@ -423,10 +423,9 @@ async def save_recording(request: dict, current_user: User = Depends(get_current
         
         if str(session.user_id) != str(current_user.id):
             raise HTTPException(status_code=403, detail="Access denied")
-        
-        # Save recording
+          # Save recording
         recording_data = {
-            'user_id': current_user.id,
+            'user_id': str(current_user.id),  # Convert PyObjectId to string
             'session_id': session_id,
             'question_index': question_index,
             'audio_data': audio_data,

@@ -238,14 +238,14 @@ class InterviewService:
                 "completed_sessions": 0,
                 "total_questions": 0,
                 "total_answers": 0,
-                "average_score": 0,                "completion_rate": 0
+                "average_score": 0,
+                "completion_rate": 0
             }
 
     async def save_recording(self, recording_data: dict) -> str:
         """Save audio recording to database"""
         try:
             from ..models.interview_models import InterviewRecording
-            from bson import ObjectId
             
             # Generate custom recording ID
             recording_id = str(uuid.uuid4())
@@ -253,7 +253,7 @@ class InterviewService:
             # Create recording document
             recording = InterviewRecording(
                 recording_id=recording_id,  # Use custom string ID
-                user_id=ObjectId(str(recording_data['user_id'])),
+                user_id=str(recording_data['user_id']),  # Keep as string
                 session_id=str(recording_data['session_id']),  # Keep as string
                 question_index=recording_data['question_index'],
                 audio_data=recording_data['audio_data'],
