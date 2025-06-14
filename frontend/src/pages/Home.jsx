@@ -1,8 +1,42 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Brain, Users, BarChart3, ArrowRight, CheckCircle, Star } from 'lucide-react';
 
 const Home = () => {
+  const [user, setUser] = useState(null);
+
+  useEffect(() => {
+    // Check if user is logged in
+    const checkAuthState = () => {
+      const token = localStorage.getItem('token');
+      const userData = localStorage.getItem('user');
+      
+      if (token && userData) {
+        try {
+          setUser(JSON.parse(userData));
+        } catch (error) {
+          console.error('Error parsing user data:', error);
+          setUser(null);
+        }
+      } else {
+        setUser(null);
+      }
+    };
+
+    // Check auth state on mount
+    checkAuthState();
+
+    // Listen for auth state changes
+    const handleAuthChange = () => {
+      checkAuthState();
+    };
+
+    window.addEventListener('authStateChanged', handleAuthChange);
+
+    return () => {
+      window.removeEventListener('authStateChanged', handleAuthChange);
+    };
+  }, []);
   const features = [
     {
       icon: <Users className="h-8 w-8 text-primary-600" />,
@@ -63,13 +97,15 @@ const Home = () => {
             <span>Start Practice Interview</span>
             <ArrowRight className="h-5 w-5" />
           </Link>
-          <Link
-            to="/dashboard"
-            className="btn-secondary btn-lg inline-flex items-center space-x-2"
-          >
-            <BarChart3 className="h-5 w-5" />
-            <span>View Dashboard</span>
-          </Link>
+          {user && (
+            <Link
+              to="/dashboard"
+              className="btn-secondary btn-lg inline-flex items-center space-x-2"
+            >
+              <BarChart3 className="h-5 w-5" />
+              <span>View Dashboard</span>
+            </Link>
+          )}
         </div>
       </section>
 
