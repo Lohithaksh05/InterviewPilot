@@ -334,7 +334,7 @@ const Home = () => {
           </div>
           <h2 className="text-4xl md:text-5xl font-bold text-white">
             Supercharge Your
-            <span className="block text-transparent bg-clip-text bg-gradient-to-r from-primary-400 to-purple-400">
+            <span className="block text-white bg-clip-text bg-gradient-to-r from-primary-400 to-purple-400">
               Interview Success
             </span>
           </h2>
