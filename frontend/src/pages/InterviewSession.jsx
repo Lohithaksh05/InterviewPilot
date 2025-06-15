@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Send, ArrowRight, Clock, MessageCircle } from 'lucide-react';
+import { Send, ArrowRight, Clock, MessageCircle, Mic, MicOff, Brain, Sparkles, Zap } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { interviewAPI } from '../services/api';
 import EnhancedLiveSpeech from '../components/EnhancedLiveSpeechSimple';
@@ -133,204 +133,282 @@ const InterviewSession = () => {
 
   const currentQuestion = session?.questions[session?.current_question];
   const progress = session ? ((session.current_question / session.total_questions) * 100) : 0;
-
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-gray-900 flex items-center justify-center">
+        <div className="relative">
+          <div className="animate-spin rounded-full h-16 w-16 border-4 border-transparent bg-gradient-to-r from-cyan-400 to-purple-500"></div>
+          <div className="absolute inset-2 animate-spin rounded-full h-12 w-12 border-4 border-transparent bg-gradient-to-r from-purple-500 to-cyan-400" style={{ animationDirection: 'reverse', animationDuration: '1s' }}></div>
+          <div className="absolute inset-4 rounded-full h-8 w-8 bg-gray-900"></div>
+        </div>
       </div>
     );
   }
 
   if (!session) {
     return (
-      <div className="text-center space-y-4">
-        <h2 className="text-2xl font-bold text-gray-900">Session Not Found</h2>
-        <p className="text-gray-600">The interview session could not be found.</p>
-        <button onClick={() => navigate('/interview')} className="btn-primary">
-          Start New Interview
-        </button>
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-gray-900 flex items-center justify-center">
+        <div className="text-center space-y-6 glass-card p-8 max-w-md">
+          <div className="relative">
+            <Brain className="h-16 w-16 text-gray-400 mx-auto animate-pulse" />
+            <div className="absolute inset-0 bg-gradient-to-r from-cyan-400/20 to-purple-400/20 rounded-full blur-xl"></div>
+          </div>
+          <h2 className="text-2xl font-bold text-white">Session Not Found</h2>
+          <p className="text-gray-300">The interview session could not be found.</p>
+          <button 
+            onClick={() => navigate('/interview')} 
+            className="group relative overflow-hidden bg-gradient-to-r from-cyan-500 to-purple-600 hover:from-cyan-400 hover:to-purple-500 text-white px-8 py-4 rounded-2xl font-semibold transition-all duration-300 transform hover:scale-105 hover:shadow-xl hover:shadow-purple-500/25 flex items-center space-x-2 mx-auto"
+          >
+            <Sparkles className="h-5 w-5 group-hover:animate-spin transition-transform duration-300" />
+            <span>Start New Interview</span>
+          </button>
+        </div>
       </div>
     );
   }
-
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
-      {/* Header */}
-      <div className="card">
-        <div className="flex justify-between items-center mb-4">
-          <h1 className="text-2xl font-bold text-gray-900">
-            Interview Session
-          </h1>
-          <div className="flex items-center space-x-4 text-sm text-gray-600">
-            <div className="flex items-center space-x-1">
-              <Clock className="h-4 w-4" />
-              <span>Question {session.current_question + 1} of {session.total_questions}</span>
-            </div>
-            <div className="flex items-center space-x-1">
-              <MessageCircle className="h-4 w-4" />
-              <span className="capitalize">{session.interviewer_type.replace('_', ' ')}</span>
-            </div>
-          </div>
-        </div>
-        
-        {/* Progress Bar */}
-        <div className="w-full bg-gray-200 rounded-full h-2">
-          <div 
-            className="bg-primary-600 h-2 rounded-full transition-all duration-300"
-            style={{ width: `${progress}%` }}
-          ></div>
-        </div>
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-gray-900 relative overflow-hidden">
+      {/* Animated Background Elements */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="floating-orb bg-gradient-to-r from-cyan-400/20 to-purple-500/20 w-72 h-72 -top-36 -left-36"></div>
+        <div className="floating-orb bg-gradient-to-r from-purple-500/20 to-pink-500/20 w-96 h-96 -top-48 -right-48 animation-delay-2000"></div>
+        <div className="floating-orb bg-gradient-to-r from-blue-500/20 to-cyan-400/20 w-64 h-64 bottom-0 left-1/4 animation-delay-4000"></div>
       </div>
 
-      {/* Current Question */}
-      <div className="card">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Current Question:</h2>
-        <div className="bg-gray-50 rounded-lg p-6">
-          <p className="text-lg text-gray-800">{currentQuestion}</p>
-        </div>
-      </div>
-
-      {/* Answer Input */}
-      <div className="card">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Your Answer:</h3>
-        <div className="space-y-4">
-          <textarea
-            ref={answerRef}
-            className="textarea-field h-40"
-            placeholder="Type your answer here... Be specific and provide examples where possible."
-            value={currentAnswer}
-            onChange={(e) => setCurrentAnswer(e.target.value)}
-            disabled={submitting}          />
-          
-          {/* Enhanced Live Speech - Transcription + Recording */}
-          <div className="mt-4">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              🎤 Live Speech (Real-time Transcription + Recording)
-            </label>            <EnhancedLiveSpeech
-              ref={enhancedLiveSpeechRef}
-              onTranscriptionUpdate={handleTranscriptionUpdate}
-              onRecordingComplete={handleRecordingComplete}
-              disabled={submitting}
-              sessionId={sessionId}
-              questionIndex={session?.current_question}
-              className="bg-gray-50 p-4 rounded-lg border border-gray-200"
-            /><p className="text-xs text-gray-500 mt-2">
-              Start speaking to see real-time transcription AND automatically record your speech for playback later.
-            </p>            <div className="text-sm text-gray-600 mt-1">
-              Character count: {currentAnswer.length}
+      <div className="relative z-10 container mx-auto px-4 py-8">
+        <div className="max-w-4xl mx-auto space-y-8">
+          {/* Header */}
+          <div className="glass-card animate-fade-in-up">
+            <div className="flex flex-col md:flex-row md:justify-between md:items-center mb-6">
+              <h1 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-cyan-400 via-purple-400 to-pink-400 bg-clip-text text-transparent animate-gradient-x mb-4 md:mb-0">
+                Live Interview Session
+              </h1>
+              <div className="flex flex-col md:flex-row md:items-center space-y-2 md:space-y-0 md:space-x-6 text-sm text-gray-300">
+                <div className="flex items-center space-x-2 glass-pill px-4 py-2">
+                  <Clock className="h-4 w-4 text-cyan-400" />
+                  <span className="font-medium">Question {session.current_question + 1} of {session.total_questions}</span>
+                </div>
+                <div className="flex items-center space-x-2 glass-pill px-4 py-2">
+                  <Brain className="h-4 w-4 text-purple-400" />
+                  <span className="font-medium capitalize">{session.interviewer_type.replace('_', ' ')}</span>
+                </div>
+              </div>
             </div>
-          </div>
-          
-          {/* Action Buttons */}
-          <div className="flex justify-between items-center mt-4">
             
-            <button
-              onClick={submitAnswer}
-              disabled={submitting || !currentAnswer.trim()}
-              className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
-            >
-              {submitting ? (
-                <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                  <span>Submitting...</span>
-                </>
-              ) : (
-                <>
-                  <Send className="h-4 w-4" />
-                  <span>Submit Answer</span>
-                </>
-              )}
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Previous Q&A (if any) */}
-      {session.answers.length > 0 && (
-        <div className="card">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Previous Questions & Answers:</h3>
-          <div className="space-y-6">
-            {session.questions.slice(0, session.current_question).map((question, index) => (
-              <div key={index} className="border-l-4 border-primary-200 pl-4 space-y-2">
-                <div className="space-y-2">
-                  <p className="font-medium text-gray-900">Q{index + 1}: {question}</p>
-                  <p className="text-gray-700 bg-gray-50 p-3 rounded">
-                    A: {session.answers[index]}
-                  </p>                  {session.feedback[index] && (
-                    <div className="space-y-3">
-                      {/* Score */}
-                      <div className="flex items-center space-x-2">
-                        <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-                          session.feedback[index].score >= 8 ? 'bg-green-100 text-green-800' :
-                          session.feedback[index].score >= 6 ? 'bg-yellow-100 text-yellow-800' :
-                          'bg-red-100 text-red-800'
-                        }`}>
-                          Score: {session.feedback[index].score}/10
-                        </span>
+            {/* Progress Bar */}
+            <div className="relative">
+              <div className="w-full bg-gray-700/50 rounded-full h-3 overflow-hidden">
+                <div 
+                  className="bg-gradient-to-r from-cyan-500 to-purple-600 h-3 rounded-full transition-all duration-500 relative"
+                  style={{ width: `${progress}%` }}
+                >
+                  <div className="absolute inset-0 bg-gradient-to-r from-white/20 to-transparent animate-pulse"></div>
+                </div>
+              </div>
+              <div className="absolute right-0 top-4 text-xs text-gray-400 font-medium">
+                {Math.round(progress)}% Complete
+              </div>
+            </div>
+          </div>          {/* Current Question */}
+          <div className="glass-card animate-fade-in-up animation-delay-200">
+            <div className="flex items-center space-x-3 mb-6">
+              <div className="p-3 rounded-2xl bg-gradient-to-br from-cyan-500/20 to-blue-500/20">
+                <MessageCircle className="h-6 w-6 text-cyan-400" />
+              </div>
+              <h2 className="text-2xl font-bold text-white">Current Question</h2>
+            </div>
+            <div className="bg-gradient-to-br from-gray-800/50 to-gray-700/50 rounded-2xl p-8 border border-gray-600/30">
+              <p className="text-xl text-gray-100 leading-relaxed font-medium">{currentQuestion}</p>
+            </div>
+          </div>          {/* Answer Input */}
+          <div className="glass-card animate-fade-in-up animation-delay-400">
+            <div className="flex items-center space-x-3 mb-6">
+              <div className="p-3 rounded-2xl bg-gradient-to-br from-green-500/20 to-emerald-500/20">
+                <Mic className="h-6 w-6 text-green-400" />
+              </div>
+              <h3 className="text-2xl font-bold text-white">Your Answer</h3>
+            </div>
+            <div className="space-y-6">
+              <div className="relative">
+                <textarea
+                  ref={answerRef}                  className="w-full h-48 px-6 py-4 bg-gradient-to-br from-slate-900/90 via-gray-900/80 to-slate-800/90 border border-cyan-500/20 rounded-2xl text-white placeholder-cyan-200/60 focus:outline-none focus:ring-2 focus:ring-cyan-400/60 focus:border-cyan-400/60 transition-all duration-300 resize-none hover:border-cyan-500/40 hover:shadow-lg hover:shadow-cyan-500/10 backdrop-blur-md"
+                  placeholder="Type your answer here... Be specific and provide examples where possible."
+                  value={currentAnswer}
+                  onChange={(e) => setCurrentAnswer(e.target.value)}
+                  disabled={submitting}
+                />
+                <div className="absolute bottom-4 right-4 text-xs text-gray-400 font-medium">
+                  {currentAnswer.length} characters
+                </div>
+              </div>
+              
+              {/* Enhanced Live Speech - Transcription + Recording */}
+              <div className="space-y-3">
+                <div className="flex items-center space-x-2">
+                  <Zap className="h-5 w-5 text-yellow-400" />
+                  <label className="text-lg font-semibold text-white">
+                    Live Speech (Real-time Transcription + Recording)
+                  </label>
+                </div>
+                <EnhancedLiveSpeech
+                  ref={enhancedLiveSpeechRef}
+                  onTranscriptionUpdate={handleTranscriptionUpdate}
+                  onRecordingComplete={handleRecordingComplete}
+                  disabled={submitting}
+                  sessionId={sessionId}
+                  questionIndex={session?.current_question}
+                  className="bg-gradient-to-br from-gray-800/30 to-gray-700/30 p-6 rounded-2xl border border-gray-600/20"
+                />
+                <p className="text-sm text-gray-400 flex items-center space-x-2">
+                  <Sparkles className="h-4 w-4 text-cyan-400" />
+                  <span>Start speaking to see real-time transcription AND automatically record your speech for playback later.</span>
+                </p>
+              </div>
+              
+              {/* Action Buttons */}
+              <div className="flex justify-between items-center pt-4">
+                <div className="text-sm text-gray-400">
+                  Take your time to craft a thoughtful response
+                </div>
+                <button
+                  onClick={submitAnswer}
+                  disabled={submitting || !currentAnswer.trim()}
+                  className="group relative overflow-hidden bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-400 hover:to-emerald-500 text-white px-8 py-4 rounded-2xl font-bold text-lg transition-all duration-300 transform hover:scale-105 hover:shadow-xl hover:shadow-green-500/25 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center space-x-3"
+                >
+                  {submitting ? (
+                    <>
+                      <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></div>
+                      <span>Submitting...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Send className="h-5 w-5 group-hover:translate-x-1 transition-transform duration-300" />
+                      <span>Submit Answer</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>          {/* Previous Q&A (if any) */}
+          {session.answers.length > 0 && (
+            <div className="glass-card animate-fade-in-up animation-delay-600">
+              <div className="flex items-center space-x-3 mb-6">
+                <div className="p-3 rounded-2xl bg-gradient-to-br from-purple-500/20 to-pink-500/20">
+                  <MessageCircle className="h-6 w-6 text-purple-400" />
+                </div>
+                <h3 className="text-2xl font-bold text-white">Previous Questions & Answers</h3>
+              </div>
+              <div className="space-y-8">
+                {session.questions.slice(0, session.current_question).map((question, index) => (
+                  <div key={index} className="border-l-4 border-gradient-to-b from-cyan-500 to-purple-500 pl-6 space-y-4 animate-fade-in-up" style={{ animationDelay: `${index * 100}ms` }}>
+                    <div className="space-y-4">
+                      <p className="font-bold text-white text-lg">Q{index + 1}: {question}</p>
+                      <div className="bg-gradient-to-br from-gray-800/30 to-gray-700/30 p-4 rounded-2xl border border-gray-600/20">
+                        <p className="text-gray-300 leading-relaxed">
+                          A: {session.answers[index]}
+                        </p>
                       </div>
-
-                      {/* Feedback */}
-                      {session.feedback[index].feedback && (
-                        <div className="bg-blue-50 p-3 rounded-lg">
-                          <p className="text-blue-800 text-sm leading-relaxed">
-                            {session.feedback[index].feedback}
-                          </p>
-                        </div>
-                      )}
-
-                      {/* Strengths */}
-                      {session.feedback[index].strengths?.length > 0 && (
-                        <div className="space-y-2">
-                          <h5 className="text-xs font-semibold text-green-700 uppercase tracking-wide">
-                            Strengths
-                          </h5>
-                          <div className="flex flex-wrap gap-1">
-                            {session.feedback[index].strengths.map((strength, i) => (
-                              <span key={i} className="bg-green-100 text-green-800 px-2 py-1 rounded text-xs">
-                                ✓ {strength}
-                              </span>
-                            ))}
+                      {session.feedback[index] && (
+                        <div className="space-y-4">
+                          {/* Score */}
+                          <div className="flex items-center space-x-3">
+                            <span className={`px-4 py-2 rounded-full text-sm font-bold border ${
+                              session.feedback[index].score >= 8 ? 'bg-green-500/20 text-green-300 border-green-500/30' :
+                              session.feedback[index].score >= 6 ? 'bg-yellow-500/20 text-yellow-300 border-yellow-500/30' :
+                              'bg-red-500/20 text-red-300 border-red-500/30'
+                            }`}>
+                              Score: {session.feedback[index].score}/10
+                            </span>
                           </div>
-                        </div>
-                      )}
 
-                      {/* Improvements */}
-                      {session.feedback[index].improvements?.length > 0 && (
-                        <div className="space-y-2">
-                          <h5 className="text-xs font-semibold text-yellow-700 uppercase tracking-wide">
-                            Areas for Improvement
-                          </h5>
-                          <div className="space-y-1">
-                            {session.feedback[index].improvements.slice(0, 3).map((improvement, i) => (
-                              <div key={i} className="flex items-start space-x-2">
-                                <span className="text-yellow-500 text-xs mt-1">💡</span>
-                                <span className="text-yellow-800 text-xs leading-relaxed">
-                                  {improvement}
-                                </span>
+                          {/* Feedback */}
+                          {session.feedback[index].feedback && (
+                            <div className="bg-gradient-to-br from-blue-500/10 to-cyan-500/10 p-4 rounded-2xl border border-blue-500/20">
+                              <p className="text-blue-300 leading-relaxed">
+                                {session.feedback[index].feedback}
+                              </p>
+                            </div>
+                          )}
+
+                          {/* Strengths */}
+                          {session.feedback[index].strengths?.length > 0 && (
+                            <div className="space-y-3">
+                              <h5 className="text-sm font-bold text-green-400 uppercase tracking-wide flex items-center space-x-2">
+                                <Sparkles className="h-4 w-4" />
+                                <span>Strengths</span>
+                              </h5>
+                              <div className="flex flex-wrap gap-2">
+                                {session.feedback[index].strengths.map((strength, i) => (
+                                  <span key={i} className="bg-green-500/20 text-green-300 px-3 py-1 rounded-full text-sm border border-green-500/30">
+                                    ✓ {strength}
+                                  </span>
+                                ))}
                               </div>
-                            ))}
-                          </div>
+                            </div>
+                          )}
+
+                          {/* Improvements */}
+                          {session.feedback[index].improvements?.length > 0 && (
+                            <div className="space-y-3">
+                              <h5 className="text-sm font-bold text-yellow-400 uppercase tracking-wide flex items-center space-x-2">
+                                <Zap className="h-4 w-4" />
+                                <span>Areas for Improvement</span>
+                              </h5>
+                              <div className="space-y-2">
+                                {session.feedback[index].improvements.slice(0, 3).map((improvement, i) => (
+                                  <div key={i} className="flex items-start space-x-3">
+                                    <span className="text-yellow-400 text-sm mt-1">💡</span>
+                                    <span className="text-yellow-300 text-sm leading-relaxed">
+                                      {improvement}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
-                  )}
-                </div>
+                  </div>
+                ))}
               </div>
-            ))}
+            </div>
+          )}
+
+          {/* Tips */}
+          <div className="glass-card bg-gradient-to-r from-blue-500/10 to-purple-500/10 border-blue-500/20 animate-fade-in-up animation-delay-800">
+            <div className="flex items-center space-x-3 mb-6">
+              <div className="p-3 rounded-2xl bg-gradient-to-br from-yellow-400/20 to-orange-400/20">
+                <Brain className="h-6 w-6 text-yellow-400" />
+              </div>
+              <h3 className="text-2xl font-bold text-white bg-gradient-to-r from-yellow-400 to-orange-400 bg-clip-text text-transparent">
+                Pro Tips for Better Answers
+              </h3>
+            </div>
+            <div className="grid md:grid-cols-2 gap-4">
+              <ul className="text-blue-300 space-y-3">
+                <li className="flex items-start space-x-3">
+                  <Sparkles className="h-4 w-4 text-cyan-400 mt-1 flex-shrink-0" />
+                  <span>Use the STAR method (Situation, Task, Action, Result) for behavioral questions</span>
+                </li>
+                <li className="flex items-start space-x-3">
+                  <Sparkles className="h-4 w-4 text-cyan-400 mt-1 flex-shrink-0" />
+                  <span>Provide specific examples from your experience</span>
+                </li>
+              </ul>
+              <ul className="text-blue-300 space-y-3">
+                <li className="flex items-start space-x-3">
+                  <Sparkles className="h-4 w-4 text-cyan-400 mt-1 flex-shrink-0" />
+                  <span>Be concise but comprehensive in your answers</span>
+                </li>
+                <li className="flex items-start space-x-3">
+                  <Sparkles className="h-4 w-4 text-cyan-400 mt-1 flex-shrink-0" />
+                  <span>Take your time to think before responding</span>
+                </li>
+              </ul>
+            </div>
           </div>
         </div>
-      )}
-
-      {/* Tips */}
-      <div className="card bg-blue-50 border-blue-200">
-        <h3 className="text-lg font-semibold text-blue-900 mb-2">💡 Tips for Better Answers:</h3>
-        <ul className="text-blue-800 space-y-1 text-sm">
-          <li>• Use the STAR method (Situation, Task, Action, Result) for behavioral questions</li>
-          <li>• Provide specific examples from your experience</li>
-          <li>• Be concise but comprehensive in your answers</li>
-          <li>• Take your time to think before responding</li>
-        </ul>
       </div>
     </div>
   );
