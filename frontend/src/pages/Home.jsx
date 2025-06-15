@@ -241,17 +241,12 @@ const Home = () => {
             <div className="space-y-4">
               <h1 className="text-5xl md:text-7xl font-bold text-white leading-tight">
                 Master Your
-              </h1>              {/* Crystal Clear Dream Interview Animation */}
+              </h1>              {/* Dream Interview Animation with Color Transition */}
               <div className="relative">
-                <h2 className="text-5xl md:text-7xl font-bold holographic neon-text transition-all duration-500">
+                <h2 className="text-5xl md:text-7xl font-bold holographic transition-all duration-500">
                   {typedText}
                   <span className="animate-blink text-primary-400">|</span>
                 </h2>
-                
-                {/* Very subtle background glow - much reduced */}
-                <div className="absolute inset-0 text-5xl md:text-7xl font-bold text-primary-400/10 blur-sm -z-10">
-                  {typedText}
-                </div>
               </div>
             </div>
             
