@@ -1,5 +1,6 @@
 // Create a completely new, enhanced InterviewTemplates component
 import React, { useState, useEffect } from 'react';
+import ReactDOM from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { templatesAPI } from '../services/api';
 import { 
@@ -86,10 +87,38 @@ const EnhancedInterviewTemplates = ({ onTemplateSelect }) => {
       } finally {
         setLoading(false);
       }
+    };    loadTemplates();
+  }, []);
+  // Prevent body scroll when modal is open
+  useEffect(() => {
+    if (showModal || showComparison) {
+      // Prevent scrolling
+      document.body.classList.add('modal-open');
+    } else {
+      // Restore scrolling
+      document.body.classList.remove('modal-open');
+    }
+
+    // Cleanup function to restore scroll when component unmounts
+    return () => {
+      document.body.classList.remove('modal-open');
+    };
+  }, [showModal, showComparison]);
+
+  // Handle escape key to close modal
+  useEffect(() => {
+    const handleEscape = (event) => {
+      if (event.key === 'Escape') {
+        if (showModal) setShowModal(false);
+        if (showComparison) setShowComparison(false);
+      }
     };
 
-    loadTemplates();
-  }, []);
+    if (showModal || showComparison) {
+      document.addEventListener('keydown', handleEscape);
+      return () => document.removeEventListener('keydown', handleEscape);
+    }
+  }, [showModal, showComparison]);
 
   // Filter templates based on selected job role
   const filteredTemplates = templates.filter(template => 
@@ -103,129 +132,59 @@ const EnhancedInterviewTemplates = ({ onTemplateSelect }) => {
       [templateId]: !prev[templateId]
     }));
   };
-
-  const renderSkillsWithExpansion = (skills, templateId, maxDisplay = 3) => {
-    if (!skills || skills.length === 0) return null;
-    
-    const isExpanded = expandedSkills[templateId];
-    const displaySkills = isExpanded ? skills : skills.slice(0, maxDisplay);
-    const remainingCount = skills.length - maxDisplay;
-
-    return (
-      <div className="space-y-2">
-        <div className="flex flex-wrap gap-2">
-          {displaySkills.map((skill, index) => (
-            <span
-              key={index}
-              className="px-3 py-1 bg-cyan-500/20 text-cyan-300 rounded-full text-sm font-medium border border-cyan-500/30 hover:bg-cyan-500/30 transition-colors"
-            >
-              {skill}
-            </span>
-          ))}
-        </div>
-        
-        {remainingCount > 0 && (
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              toggleSkillsExpansion(templateId);
-            }}
-            className="flex items-center gap-1 text-cyan-400 hover:text-cyan-300 transition-colors text-sm font-medium hover:bg-cyan-500/10 px-2 py-1 rounded"
-          >
-            {isExpanded ? (
-              <>
-                <ChevronUp className="w-4 h-4" />
-                Show Less
-              </>
-            ) : (
-              <>
-                <ChevronDown className="w-4 h-4" />
-                +{remainingCount} more skills
-              </>
-            )}
-          </button>
-        )}
-      </div>
-    );
-  };
-
-  // Template comparison functionality
-  const toggleCompareTemplate = (template, event) => {
-    event.stopPropagation();
-    setCompareTemplates(prev => {
-      const exists = prev.find(t => t.id === template.id);
-      if (exists) {
-        return prev.filter(t => t.id !== template.id);
-      } else if (prev.length < 3) {
-        return [...prev, template];
-      }
-      return prev;
-    });
-  };
-
-  // Handle template comparison
-  const handleCompareToggle = (template) => {
-    setCompareTemplates(prev => {
-      const isSelected = prev.find(t => t.id === template.id);
-      if (isSelected) {
-        return prev.filter(t => t.id !== template.id);
-      } else if (prev.length < 3) {
-        return [...prev, template];
-      }
-      return prev;
-    });
-  };
   // Loading state
   if (loading) {
     return (
-      <div className="flex justify-center items-center py-12">
-        <div className="text-center">
-          <div className="w-12 h-12 border-4 border-cyan-400 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-400">Loading templates...</p>
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 via-purple-900 to-gray-900">
+        <div className="relative">
+          <div className="animate-spin rounded-full h-16 w-16 border-4 border-transparent bg-gradient-to-r from-cyan-400 to-purple-500"></div>
+          <div className="absolute inset-2 animate-spin rounded-full h-12 w-12 border-4 border-transparent bg-gradient-to-r from-purple-500 to-cyan-400" style={{ animationDirection: 'reverse', animationDuration: '1s' }}></div>
+          <div className="absolute inset-4 rounded-full h-8 w-8 bg-gray-900"></div>
         </div>
       </div>
     );
   }
 
-  // Fix for React Error: Handle common_questions as objects with {text, category, difficulty}
-  // and improve border colors for better visual consistency
-
-  // Helper function to extract question text from object or string
-  const getQuestionText = (question) => {
-    if (typeof question === 'string') {
-      return question;
-    }
-    if (question && typeof question === 'object' && question.text) {
-      return question.text;
-    }
-    return 'Question not available';
-  };
-
-  // Helper function to get question difficulty for styling
-  const getQuestionDifficulty = (question) => {
-    if (question && typeof question === 'object' && question.difficulty) {
-      return question.difficulty;
-    }
-    return 'medium';
-  };
-
-  // Helper function to get difficulty color
-  const getDifficultyColor = (difficulty) => {
-    switch (difficulty) {
-      case 'easy': return 'border-green-400';
-      case 'medium': return 'border-orange-400';
-      case 'hard': return 'border-red-400';
-      default: return 'border-orange-400';
-    }
-  };
-
   // Enhanced Comparison Modal Component
   const EnhancedComparisonModal = () => {
     if (compareTemplates.length === 0 || !showComparison) return null;
-
-    return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-        <div className="relative w-full max-w-7xl max-h-[90vh] overflow-y-auto bg-gray-900/95 backdrop-blur-xl border border-gray-700/50 rounded-2xl shadow-2xl">
+    return ReactDOM.createPortal(
+      <div
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.7)',
+          backdropFilter: 'blur(4px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '1rem',
+          zIndex: 50
+        }}
+        onClick={(e) => {
+          if (e.target === e.currentTarget) {
+            setShowComparison(false);
+          }
+        }}
+      >
+        <div
+          style={{
+            position: 'relative',
+            width: '100%',
+            maxWidth: '90rem',
+            maxHeight: '90vh',
+            overflowY: 'auto',
+            background: 'rgba(17, 24, 39, 0.95)',
+            backdropFilter: 'blur(16px)',
+            border: '1px solid rgba(75, 85, 99, 0.5)',
+            borderRadius: '1rem',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
           {/* Comparison Header */}
           <div className="sticky top-0 bg-gray-900/95 backdrop-blur-xl border-b border-gray-700/50 p-6 z-10">
             <div className="flex items-center justify-between">
@@ -265,55 +224,29 @@ const EnhancedInterviewTemplates = ({ onTemplateSelect }) => {
                   {/* Comparison Metrics */}
                   <div className="space-y-4">
                     {/* Duration */}
-                    <div className="flex justify-between items-center p-3 bg-gray-700/30 rounded-lg">
-                      <span className="text-gray-300 flex items-center gap-2">
-                        <Clock className="w-4 h-4 text-blue-400" />
-                        Duration
-                      </span>
+                    <div className="flex items-center gap-2">
+                      <Clock className="w-4 h-4 text-blue-400" />
+                      <span className="text-gray-300">Duration:</span>
                       <span className="text-white font-semibold">{template.duration_minutes} min</span>
                     </div>
-
-                    {/* Experience Level */}
-                    <div className="flex justify-between items-center p-3 bg-gray-700/30 rounded-lg">
-                      <span className="text-gray-300 flex items-center gap-2">
-                        <Award className="w-4 h-4 text-green-400" />
-                        Level
-                      </span>
-                      <span className={`font-semibold capitalize px-2 py-1 rounded ${
-                        template.experience_level === 'junior' ? 'bg-green-500/20 text-green-300' :
-                        template.experience_level === 'mid' ? 'bg-yellow-500/20 text-yellow-300' :
-                        'bg-red-500/20 text-red-300'
-                      }`}>
-                        {template.experience_level}
-                      </span>
+                    {/* Level */}
+                    <div className="flex items-center gap-2">
+                      <Award className="w-4 h-4 text-green-400" />
+                      <span className="text-gray-300">Level:</span>
+                      <span className="text-white font-semibold capitalize">{template.experience_level}</span>
                     </div>
-
-                    {/* Total Questions */}
-                    <div className="flex justify-between items-center p-3 bg-gray-700/30 rounded-lg">
-                      <span className="text-gray-300 flex items-center gap-2">
-                        <BarChart3 className="w-4 h-4 text-purple-400" />
-                        Questions
-                      </span>
+                    {/* Questions */}
+                    <div className="flex items-center gap-2">
+                      <BarChart3 className="w-4 h-4 text-purple-400" />
+                      <span className="text-gray-300">Questions:</span>
                       <span className="text-white font-semibold">
                         {Object.values(template.question_distribution || {}).reduce((a, b) => a + b, 0)}
                       </span>
                     </div>
-
-                    {/* Key Skills Count */}
-                    <div className="flex justify-between items-center p-3 bg-gray-700/30 rounded-lg">
-                      <span className="text-gray-300 flex items-center gap-2">
-                        <Zap className="w-4 h-4 text-yellow-400" />
-                        Skills
-                      </span>
-                      <span className="text-white font-semibold">{template.key_skills?.length || 0}</span>
-                    </div>
-
                     {/* Interviewers */}
-                    <div className="flex justify-between items-center p-3 bg-gray-700/30 rounded-lg">
-                      <span className="text-gray-300 flex items-center gap-2">
-                        <Users className="w-4 h-4 text-orange-400" />
-                        Interviewers
-                      </span>
+                    <div className="flex items-center gap-2">
+                      <Users className="w-4 h-4 text-orange-400" />
+                      <span className="text-gray-300">Interviewers:</span>
                       <span className="text-white font-semibold">{template.interviewer_types?.length || 0}</span>
                     </div>
                   </div>                  {/* Top Skills Preview */}
@@ -433,370 +366,370 @@ const EnhancedInterviewTemplates = ({ onTemplateSelect }) => {
             </div>
           </div>
         </div>
-      </div>
+      </div>,
+      document.body
     );
-  };
-  // Template Detail Modal Component - Fixed bracket matching
+  };  // Template Detail Modal Component - now uses portal and fixed positioning, with full detailed content
   const TemplateModal = () => {
     if (!selectedTemplate) return null;
+    return ReactDOM.createPortal(
+      <div 
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.7)',
+          backdropFilter: 'blur(4px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '1rem',
+          zIndex: 50
+        }}
+        onClick={(e) => {
+          if (e.target === e.currentTarget) {
+            setShowModal(false);
+          }
+        }}
+      >
+        <div 
+          className="relative w-full max-w-5xl bg-gray-900/95 backdrop-blur-xl border border-gray-700/50 rounded-2xl shadow-2xl"
+          style={{
+            maxHeight: '90vh',
+            overflowY: 'auto',
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Modal Header */}
+          <div className="sticky top-0 bg-gray-900/95 backdrop-blur-xl border-b border-gray-700/50 p-6 z-10">
+            <div className="flex items-start justify-between">
+              <div className="flex-1">
+                <h2 className="text-3xl font-bold bg-gradient-to-r from-cyan-400 to-purple-400 bg-clip-text text-transparent mb-2">
+                  🎯 {selectedTemplate.name}
+                </h2>
+                <p className="text-gray-400 text-lg">
+                  {selectedTemplate.job_role?.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())} • {selectedTemplate.experience_level} Level
+                </p>
+              </div>
+              <button
+                onClick={() => setShowModal(false)}
+                className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+          </div>
 
-    return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-        <div className="relative w-full max-w-5xl max-h-[90vh] overflow-y-auto bg-gray-900/95 backdrop-blur-xl border border-gray-700/50 rounded-2xl shadow-2xl">
-          {/* Modal content will be here */}
-          <div className="p-6">
-            <h2 className="text-2xl font-bold text-white mb-4">{selectedTemplate.name}</h2>
-            
-            {/* Sample Questions Section */}
-            {selectedTemplate.common_questions && selectedTemplate.common_questions.length > 0 && (
-              <div className="bg-gray-800/50 p-6 rounded-xl border border-gray-700/50 mb-6">
-                <h3 className="text-lg font-semibold text-white mb-4">Sample Questions</h3>
-                <div className="space-y-3">
-                  {selectedTemplate.common_questions.slice(0, 4).map((questionObj, index) => (
-                    <div key={index} className="bg-gray-700/50 p-3 rounded-lg">
-                      <p className="text-gray-300">
-                        {typeof questionObj === 'string' ? questionObj : questionObj.text}
-                      </p>
+          {/* Modal Content */}
+          <div className="p-6 space-y-8">
+            {/* Quick Stats */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+              <div className="bg-gradient-to-br from-cyan-500/20 to-blue-600/20 p-4 rounded-xl border border-cyan-500/30">
+                <div className="flex items-center gap-3 mb-2">
+                  <Clock className="w-5 h-5 text-cyan-400" />
+                  <span className="text-cyan-400 font-medium">Duration</span>
+                </div>
+                <p className="text-white text-xl font-bold">{selectedTemplate.duration_minutes} min</p>
+              </div>
+              <div className="bg-gradient-to-br from-purple-500/20 to-pink-600/20 p-4 rounded-xl border border-purple-500/30">
+                <div className="flex items-center gap-3 mb-2">
+                  <Target className="w-5 h-5 text-purple-400" />
+                  <span className="text-purple-400 font-medium">Questions</span>
+                </div>
+                <p className="text-white text-xl font-bold">
+                  {Object.values(selectedTemplate.question_distribution || {}).reduce((a, b) => a + b, 0)}
+                </p>
+              </div>
+              <div className="bg-gradient-to-br from-orange-500/20 to-red-600/20 p-4 rounded-xl border border-orange-500/30">
+                <div className="flex items-center gap-3 mb-2">
+                  <Users className="w-5 h-5 text-orange-400" />
+                  <span className="text-orange-400 font-medium">Interviewers</span>
+                </div>
+                <p className="text-white text-xl font-bold">{selectedTemplate.interviewer_types?.length || 0}</p>
+              </div>
+            </div>
+
+            {/* Description */}
+            <div className="bg-gray-800/50 p-6 rounded-xl border border-gray-700/50">
+              <h3 className="text-xl font-semibold text-white mb-4 flex items-center gap-2">
+                <FileText className="w-6 h-6 text-blue-400" />
+                📋 Template Overview
+              </h3>
+              <p className="text-gray-300 leading-relaxed text-lg">{selectedTemplate.description}</p>
+            </div>
+
+            {/* Key Skills */}
+            <div className="bg-gray-800/50 p-6 rounded-xl border border-gray-700/50">
+              <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                <Zap className="w-5 h-5 text-yellow-400" />
+                ⚡ Key Skills You'll Be Assessed On
+              </h3>
+              <div className="flex flex-wrap gap-3">
+                {selectedTemplate.key_skills?.map((skill, index) => (
+                  <span
+                    key={index}
+                    className="px-4 py-2 bg-gradient-to-r from-yellow-500/20 to-orange-500/20 text-yellow-300 rounded-lg border border-yellow-500/30 font-medium hover:scale-105 transition-transform"
+                  >
+                    {skill}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            {/* Sample Questions Preview */}
+            {selectedTemplate.sample_questions && selectedTemplate.sample_questions.length > 0 && (
+              <div className="bg-gray-800/50 p-6 rounded-xl border border-gray-700/50">
+                <h3 className="text-lg font-semibold text-white mb-6 flex items-center gap-2">
+                  <Target className="w-5 h-5 text-orange-400" />
+                  🎯 Sample Questions You'll Face
+                </h3>
+                <div className="space-y-4">
+                  {selectedTemplate.sample_questions.slice(0, 4).map((question, index) => (
+                    <div key={index} className="bg-gray-700/50 p-4 rounded-lg border-l-4 border-orange-400 hover:bg-gray-700/70 transition-colors">
+                      <div className="flex items-start gap-3">
+                        <span className="flex-shrink-0 w-6 h-6 bg-orange-400 text-gray-900 rounded-full text-sm font-bold flex items-center justify-center">
+                          {index + 1}
+                        </span>
+                        <p className="text-gray-300 leading-relaxed">{question}</p>
+                      </div>
                     </div>
                   ))}
+                  {selectedTemplate.sample_questions.length > 4 && (
+                    <p className="text-gray-400 text-center italic">
+                      ...and {selectedTemplate.sample_questions.length - 4} more questions!
+                    </p>
+                  )}
                 </div>
               </div>
             )}
 
-            <button
-              onClick={() => setShowModal(false)}
-              className="px-4 py-2 bg-gray-700 text-white rounded-lg"
-            >
-              Close
-            </button>
+            {/* Action Buttons */}
+            <div className="flex gap-4 pt-4 border-t border-gray-700/50">
+              <button
+                onClick={() => {
+                  handleTemplateSelect(selectedTemplate);
+                  setShowModal(false);
+                }}
+                className="flex-1 flex items-center justify-center gap-3 px-6 py-4 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-semibold rounded-xl transition-all duration-300 shadow-lg hover:shadow-cyan-500/25 hover:scale-[1.02]"
+              >
+                <Play className="w-5 h-5" />
+                🚀 Start Interview with This Template
+              </button>
+              <button
+                onClick={() => setShowModal(false)}
+                className="px-6 py-4 bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white font-semibold rounded-xl transition-colors"
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
-      </div>
+      </div>,
+      document.body
     );
   };
+  
+  // Handle template comparison
+  const handleCompareToggle = (template) => {
+    setCompareTemplates(prev => {
+      const isSelected = prev.find(t => t.id === template.id);
+      if (isSelected) {
+        return prev.filter(t => t.id !== template.id);
+      } else if (prev.length < 3) {
+        return [...prev, template];
+      }
+      return prev;
+    });
+  };
+
+  // Main render
   return (
-    <div className="relative">
-      {/* Templates Grid */}
-      <div className="space-y-8">
-        {/* Controls */}
-        <div className="flex flex-col sm:flex-row gap-4 mb-8 items-center justify-between">
-          {/* Job Role Filter */}
-          <div className="flex items-center gap-3">
-            <label className="text-gray-300 font-medium">Filter by Role:</label>            <select
-              value={selectedRole}
-              onChange={(e) => setSelectedRole(e.target.value)}
-              className="glass-input border border-white/20 text-white px-4 py-2 rounded-lg focus:border-cyan-400/50 focus:ring-1 focus:ring-cyan-400/30 transition-all duration-200 bg-gray-800/50"
-              style={{
-                colorScheme: 'dark'
-              }}
-            >
-              <option value="all" className="bg-gray-800 text-white">All Job Roles</option>
-              {jobRoles.map((role, index) => {
-                // Handle both string and object formats
-                const roleValue = typeof role === 'string' ? role : (role?.value || role?.id || `role-${index}`);
-                const roleLabel = typeof role === 'string' 
-                  ? role.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
-                  : (role?.label || role?.name || roleValue);
-                  return (
+      <div className="relative">
+        {/* Templates Grid */}
+        <div className="space-y-8">
+          {/* Controls */}
+          <div className="flex flex-col sm:flex-row gap-4 mb-8 items-center justify-between">
+            {/* Job Role Filter */}
+            <div className="flex items-center gap-3">
+              <label className="text-gray-300 font-medium">Filter by Role:</label>            <select
+                value={selectedRole}
+                onChange={(e) => setSelectedRole(e.target.value)}
+                className="glass-input border border-white/20 text-white px-4 py-2 rounded-lg focus:border-cyan-400/50 focus:ring-1 focus:ring-cyan-400/30 transition-all duration-200 bg-gray-800/50"
+                style={{
+                  colorScheme: 'dark'
+                }}
+              >
+                <option value="all" className="bg-gray-800 text-white">All Job Roles</option>
+                {jobRoles.map((role, index) => {
+                  // Handle both string and object formats
+                  const roleValue = typeof role === 'string' ? role : (role?.value || role?.id || `role-${index}`);
+                  const roleLabel = typeof role === 'string' 
+                    ? role.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
+                    : (role?.label || role?.name || roleValue);
+                    return (
                   <option key={`role-${index}-${roleValue}`} value={roleValue} className="bg-gray-800 text-white">
                     {roleLabel}
                   </option>
                 );
-              })}
-            </select>
+                })}
+              </select>
+            </div>
+
+            {/* Comparison controls */}
+            {compareTemplates.length > 0 && (
+              <div className="flex items-center gap-4">
+                <span className="text-gray-300 bg-purple-500/20 px-3 py-2 rounded-lg border border-purple-500/20">
+                  📊 {compareTemplates.length} template{compareTemplates.length !== 1 ? 's' : ''} selected for comparison
+                </span>
+                <button
+                  onClick={() => setShowComparison(true)}
+                  className="flex items-center gap-2 px-4 py-2 bg-purple-600/20 text-purple-400 border border-purple-500/20 rounded-lg hover:bg-purple-600/30 transition-colors"
+                >
+                  <GitCompare className="w-4 h-4" />
+                  Compare Now
+                </button>
+                <button
+                  onClick={() => setCompareTemplates([])}
+                  className="flex items-center gap-2 px-4 py-2 bg-gray-600/20 text-gray-400 border border-gray-500/30 rounded-lg hover:bg-gray-600/30 transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                  Clear
+                </button>
+              </div>
+            )}
           </div>
 
-          {/* Comparison controls */}
-          {compareTemplates.length > 0 && (
-            <div className="flex items-center gap-4">
-              <span className="text-gray-300 bg-purple-500/20 px-3 py-2 rounded-lg border border-purple-500/20">
-                📊 {compareTemplates.length} template{compareTemplates.length !== 1 ? 's' : ''} selected for comparison
-              </span>
-              <button
-                onClick={() => setShowComparison(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-purple-600/20 text-purple-400 border border-purple-500/20 rounded-lg hover:bg-purple-600/30 transition-colors"
-              >
-                <GitCompare className="w-4 h-4" />
-                Compare Now
-              </button>
-              <button
-                onClick={() => setCompareTemplates([])}
-                className="flex items-center gap-2 px-4 py-2 bg-gray-600/20 text-gray-400 border border-gray-500/30 rounded-lg hover:bg-gray-600/30 transition-colors"
-              >
-                <X className="w-4 h-4" />
-                Clear
-              </button>
+          {/* Loading State */}
+          {loading && (
+            <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 via-purple-900 to-gray-900">
+              <div className="relative">
+                <div className="animate-spin rounded-full h-16 w-16 border-4 border-transparent bg-gradient-to-r from-cyan-400 to-purple-500"></div>
+                <div className="absolute inset-2 animate-spin rounded-full h-12 w-12 border-4 border-transparent bg-gradient-to-r from-purple-500 to-cyan-400" style={{ animationDirection: 'reverse', animationDuration: '1s' }}></div>
+                <div className="absolute inset-4 rounded-full h-8 w-8 bg-gray-900"></div>
+              </div>
             </div>
           )}
-        </div>
 
-        {/* Loading State */}
-        {loading && (
-          <div className="flex justify-center items-center py-12">
-            <div className="text-center">
-              <div className="w-12 h-12 border-4 border-cyan-400 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-              <p className="text-gray-400">Loading templates...</p>
-            </div>
-          </div>
-        )}
-
-        {/* Templates Grid */}
-        {!loading && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {filteredTemplates.map((template) => (              <div
-                key={template.id}
-                className="group relative bg-gradient-to-br from-gray-800/60 to-gray-900/60 backdrop-blur-sm p-6 rounded-2xl hover:bg-gradient-to-br hover:from-gray-800/80 hover:to-gray-900/80 transition-all duration-500 hover:scale-[1.02] hover:shadow-2xl hover:shadow-cyan-500/10"
-              >
-                {/* Template Card Content */}
-                <div className="flex items-start justify-between mb-4">
-                  <div>
-                    <h3 className="text-xl font-bold text-white mb-2 group-hover:text-cyan-400 transition-colors">
-                      {template.name}
-                    </h3>
-                    <p className="text-gray-400 text-sm">
-                      {template.job_role?.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                    </p>
-                  </div>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => {
-                        setSelectedTemplate(template);
-                        setShowModal(true);
-                      }}
-                      className="p-2 bg-gray-700/50 hover:bg-cyan-600/50 text-gray-400 hover:text-white rounded-lg transition-colors"
-                      title="View Details"
-                    >
-                      <Eye className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => handleCompareToggle(template)}
-                      className={`p-2 rounded-lg transition-colors ${
-                        compareTemplates.find(t => t.id === template.id)
-                          ? 'bg-purple-600/50 text-purple-300'
-                          : 'bg-gray-700/50 hover:bg-purple-600/50 text-gray-400 hover:text-white'
-                      }`}
-                      title="Add to Comparison"
-                    >
-                      {compareTemplates.find(t => t.id === template.id) ? (
-                        <Minus className="w-4 h-4" />
-                      ) : (
-                        <Plus className="w-4 h-4" />
-                      )}
-                    </button>
-                  </div>
-                </div>
-
-                {/* Template Stats */}
-                <div className="grid grid-cols-2 gap-4 mb-6">
-                  <div className="bg-gray-700/30 p-3 rounded-lg">
-                    <div className="flex items-center gap-2">
-                      <Clock className="w-4 h-4 text-blue-400" />
-                      <span className="text-gray-300 text-sm">Duration</span>
+          {/* Templates Grid */}
+          {!loading && (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+              {filteredTemplates.map((template) => (              <div
+                  key={template.id}
+                  className="group relative bg-gradient-to-br from-gray-800/60 to-gray-900/60 backdrop-blur-sm p-6 rounded-2xl hover:bg-gradient-to-br hover:from-gray-800/80 hover:to-gray-900/80 transition-all duration-500 hover:scale-[1.02] hover:shadow-2xl hover:shadow-cyan-500/10"
+                >
+                  {/* Template Card Content */}
+                  <div className="flex items-start justify-between mb-4">
+                    <div>
+                      <h3 className="text-xl font-bold text-white mb-2 group-hover:text-cyan-400 transition-colors">
+                        {template.name}
+                      </h3>
+                      <p className="text-gray-400 text-sm">
+                        {template.job_role?.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                      </p>
                     </div>
-                    <p className="text-white font-semibold">{template.duration_minutes} min</p>
-                  </div>
-                  <div className="bg-gray-700/30 p-3 rounded-lg">
-                    <div className="flex items-center gap-2">
-                      <Award className="w-4 h-4 text-green-400" />
-                      <span className="text-gray-300 text-sm">Level</span>
-                    </div>
-                    <p className="text-white font-semibold capitalize">{template.experience_level}</p>
-                  </div>
-                </div>
-
-                {/* Skills Preview */}
-                <div className="mb-4">
-                  <h4 className="text-gray-300 font-medium mb-3 flex items-center gap-2">
-                    <Zap className="w-4 h-4" />
-                    Key Skills
-                  </h4>
-                  <div className="flex flex-wrap gap-2">
-                    {template.key_skills?.slice(0, expandedSkills[template.id] ? undefined : 3).map((skill, index) => (
-                      <span key={index} className="px-2 py-1 bg-cyan-500/20 text-cyan-300 rounded text-sm border border-cyan-500/30">
-                        {skill}
-                      </span>
-                    ))}
-                    {template.key_skills?.length > 3 && (
+                    <div className="flex gap-2">
                       <button
-                        onClick={() => toggleSkillsExpansion(template.id)}
-                        className="px-2 py-1 bg-gray-600/50 text-gray-400 hover:text-white rounded text-sm transition-colors flex items-center gap-1"
+                        onClick={() => {
+                          setSelectedTemplate(template);
+                          setShowModal(true);
+                        }}
+                        className="p-2 bg-gray-700/50 hover:bg-cyan-600/50 text-gray-400 hover:text-white rounded-lg transition-colors"
+                        title="View Details"
                       >
-                        {expandedSkills[template.id] ? (
-                          <>
-                            <ChevronUp className="w-3 h-3" />
-                            Show Less
-                          </>
+                        <Eye className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => handleCompareToggle(template)}
+                        className={`p-2 rounded-lg transition-colors ${
+                          compareTemplates.find(t => t.id === template.id)
+                            ? 'bg-purple-600/50 text-purple-300'
+                            : 'bg-gray-700/50 hover:bg-purple-600/50 text-gray-400 hover:text-white'
+                        }`}
+                        title="Add to Comparison"
+                      >
+                        {compareTemplates.find(t => t.id === template.id) ? (
+                          <Minus className="w-4 h-4" />
                         ) : (
-                          <>
-                            <ChevronDown className="w-3 h-3" />
-                            +{template.key_skills.length - 3} more
-                          </>
+                          <Plus className="w-4 h-4" />
                         )}
                       </button>
-                    )}
+                    </div>
                   </div>
-                </div>                {/* Action Button */}
-                <button
-                  onClick={() => handleTemplateSelect(template)}
-                  className="w-full px-4 py-3 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-semibold rounded-lg transition-all duration-300 flex items-center justify-center gap-2"
-                >
-                  <Play className="w-4 h-4" />
-                  Start Interview
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
 
-        {/* No templates found */}
-        {!loading && filteredTemplates.length === 0 && (
-          <div className="text-center py-12">
-            <p className="text-gray-400 text-lg">No templates found for the selected criteria.</p>
-          </div>
-        )}
-      </div>
-
-      {/* Enhanced Modal for Template Details */}
-      {showModal && selectedTemplate && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-          <div className="relative w-full max-w-5xl max-h-[90vh] overflow-y-auto bg-gray-900/95 backdrop-blur-xl border border-gray-700/50 rounded-2xl shadow-2xl">
-            {/* Modal Header */}
-            <div className="sticky top-0 bg-gray-900/95 backdrop-blur-xl border-b border-gray-700/50 p-6 z-10">
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <h2 className="text-3xl font-bold bg-gradient-to-r from-cyan-400 to-purple-400 bg-clip-text text-transparent mb-2">
-                    🎯 {selectedTemplate.name}
-                  </h2>
-                  <p className="text-gray-400 text-lg">
-                    {selectedTemplate.job_role?.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())} • {selectedTemplate.experience_level} Level
-                  </p>
-                </div>
-                <button
-                  onClick={() => setShowModal(false)}
-                  className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
-                >
-                  <X className="w-6 h-6" />
-                </button>
-              </div>
-            </div>
-
-            {/* Modal Content */}
-            <div className="p-6 space-y-8">
-              {/* Quick Stats */}
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div className="bg-gradient-to-br from-blue-500/20 to-purple-600/20 p-4 rounded-xl border border-blue-500/30">
-                  <div className="flex items-center gap-3 mb-2">
-                    <Clock className="w-5 h-5 text-blue-400" />
-                    <span className="text-blue-400 font-medium">Duration</span>
-                  </div>
-                  <p className="text-white text-xl font-bold">{selectedTemplate.duration_minutes} min</p>
-                </div>
-                
-                <div className="bg-gradient-to-br from-green-500/20 to-emerald-600/20 p-4 rounded-xl border border-green-500/30">
-                  <div className="flex items-center gap-3 mb-2">
-                    <Award className="w-5 h-5 text-green-400" />
-                    <span className="text-green-400 font-medium">Level</span>
-                  </div>
-                  <p className="text-white text-xl font-bold capitalize">{selectedTemplate.experience_level}</p>
-                </div>
-                
-                <div className="bg-gradient-to-br from-purple-500/20 to-pink-600/20 p-4 rounded-xl border border-purple-500/20">
-                  <div className="flex items-center gap-3 mb-2">
-                    <BarChart3 className="w-5 h-5 text-purple-400" />
-                    <span className="text-purple-400 font-medium">Questions</span>
-                  </div>
-                  <p className="text-white text-xl font-bold">
-                    {Object.values(selectedTemplate.question_distribution || {}).reduce((a, b) => a + b, 0)}
-                  </p>
-                </div>
-
-                <div className="bg-gradient-to-br from-orange-500/20 to-red-600/20 p-4 rounded-xl border border-orange-500/30">
-                  <div className="flex items-center gap-3 mb-2">
-                    <Users className="w-5 h-5 text-orange-400" />
-                    <span className="text-orange-400 font-medium">Interviewers</span>
-                  </div>
-                  <p className="text-white text-xl font-bold">{selectedTemplate.interviewer_types?.length || 0}</p>
-                </div>
-              </div>
-
-              {/* Description */}
-              <div className="bg-gray-800/50 p-6 rounded-xl border border-gray-700/50">
-                <h3 className="text-xl font-semibold text-white mb-4 flex items-center gap-2">
-                  <FileText className="w-6 h-6 text-blue-400" />
-                  📋 Template Overview
-                </h3>
-                <p className="text-gray-300 leading-relaxed text-lg">{selectedTemplate.description}</p>
-              </div>
-
-              {/* Key Skills */}
-              <div className="bg-gray-800/50 p-6 rounded-xl border border-gray-700/50">
-                <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                  <Zap className="w-5 h-5 text-yellow-400" />
-                  ⚡ Key Skills You'll Be Assessed On
-                </h3>
-                <div className="flex flex-wrap gap-3">
-                  {selectedTemplate.key_skills?.map((skill, index) => (
-                    <span
-                      key={index}
-                      className="px-4 py-2 bg-gradient-to-r from-yellow-500/20 to-orange-500/20 text-yellow-300 rounded-lg border border-yellow-500/30 font-medium hover:scale-105 transition-transform"
-                    >
-                      {skill}
-                    </span>
-                  ))}
-                </div>
-              </div>
-
-              {/* Sample Questions Preview */}
-              {selectedTemplate.sample_questions && selectedTemplate.sample_questions.length > 0 && (
-                <div className="bg-gray-800/50 p-6 rounded-xl border border-gray-700/50">
-                  <h3 className="text-lg font-semibold text-white mb-6 flex items-center gap-2">
-                    <Target className="w-5 h-5 text-orange-400" />
-                    🎯 Sample Questions You'll Face
-                  </h3>
-                  <div className="space-y-4">
-                    {selectedTemplate.sample_questions.slice(0, 4).map((question, index) => (
-                      <div key={index} className="bg-gray-700/50 p-4 rounded-lg border-l-4 border-orange-400 hover:bg-gray-700/70 transition-colors">
-                        <div className="flex items-start gap-3">
-                          <span className="flex-shrink-0 w-6 h-6 bg-orange-400 text-gray-900 rounded-full text-sm font-bold flex items-center justify-center">
-                            {index + 1}
-                          </span>
-                          <p className="text-gray-300 leading-relaxed">{question}</p>
-                        </div>
+                  {/* Template Stats */}
+                  <div className="grid grid-cols-2 gap-4 mb-6">
+                    <div className="bg-gray-700/30 p-3 rounded-lg">
+                      <div className="flex items-center gap-2">
+                        <Clock className="w-4 h-4 text-blue-400" />
+                        <span className="text-gray-300 text-sm">Duration</span>
                       </div>
-                    ))}
-                    {selectedTemplate.sample_questions.length > 4 && (
-                      <p className="text-gray-400 text-center italic">
-                        ...and {selectedTemplate.sample_questions.length - 4} more questions!
-                      </p>
-                    )}
+                      <p className="text-white font-semibold">{template.duration_minutes} min</p>
+                    </div>
+                    <div className="bg-gray-700/30 p-3 rounded-lg">
+                      <div className="flex items-center gap-2">
+                        <Award className="w-4 h-4 text-green-400" />
+                        <span className="text-gray-300 text-sm">Level</span>
+                      </div>
+                      <p className="text-white font-semibold capitalize">{template.experience_level}</p>
+                    </div>
                   </div>
-                </div>
-              )}
 
-              {/* Action Buttons */}
-              <div className="flex gap-4 pt-4 border-t border-gray-700/50">                <button
-                  onClick={() => {
-                    handleTemplateSelect(selectedTemplate);
-                    setShowModal(false);
-                  }}
-                  className="flex-1 flex items-center justify-center gap-3 px-6 py-4 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-semibold rounded-xl transition-all duration-300 shadow-lg hover:shadow-cyan-500/25 hover:scale-[1.02]"
-                >
-                  <Play className="w-5 h-5" />
-                  🚀 Start Interview with This Template
-                </button>
-                <button
-                  onClick={() => setShowModal(false)}
-                  className="px-6 py-4 bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white font-semibold rounded-xl transition-colors"
-                >
-                  Close
-                </button>
-              </div>
+                  {/* Skills Preview */}
+                  <div className="mb-4">
+                    <h4 className="text-gray-300 font-medium mb-3 flex items-center gap-2">
+                      <Zap className="w-4 h-4" />
+                      Key Skills
+                    </h4>
+                    <div className="flex flex-wrap gap-2">
+                      {template.key_skills?.slice(0, expandedSkills[template.id] ? undefined : 3).map((skill, index) => (
+                        <span key={index} className="px-2 py-1 bg-cyan-500/20 text-cyan-300 rounded text-sm border border-cyan-500/30">
+                          {skill}
+                        </span>
+                      ))}
+                      {template.key_skills?.length > 3 && (
+                        <button
+                          onClick={() => toggleSkillsExpansion(template.id)}
+                          className="px-2 py-1 bg-gray-600/50 text-gray-400 hover:text-white rounded text-sm transition-colors flex items-center gap-1"
+                        >
+                          {expandedSkills[template.id] ? (
+                            <>
+                              <ChevronUp className="w-3 h-3" />
+                              Show Less
+                            </>
+                          ) : (
+                            <>
+                              <ChevronDown className="w-3 h-3" />
+                              +{template.key_skills.length - 3} more
+                            </>
+                          )}
+                        </button>
+                      )}
+                    </div>
+                  </div>                {/* Action Button */}
+                  <button
+                    onClick={() => handleTemplateSelect(template)}
+                    className="w-full px-4 py-3 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-semibold rounded-lg transition-all duration-300 flex items-center justify-center gap-2"
+                  >
+                    <Play className="w-4 h-4" />
+                    Start Interview
+                  </button>
+                </div>
+              ))}
             </div>
-          </div>
-        </div>
-      )}      {/* Modals */}
-      {showComparison && <EnhancedComparisonModal />}
-    </div>
+          )}
+
+          {/* No templates found */}
+          {!loading && filteredTemplates.length === 0 && (
+            <div className="text-center py-12">
+              <p className="text-gray-400 text-lg">No templates found for the selected criteria.</p>
+            </div>
+          )}
+        </div>      {/* Portals for modals */}
+      {showModal && selectedTemplate && TemplateModal()}
+      {showComparison && compareTemplates.length > 0 && EnhancedComparisonModal()}
+      </div>
   );
 };
 

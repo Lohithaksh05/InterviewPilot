@@ -780,4 +780,41 @@ select.glass-input option {
   opacity: 0.4;
 }
 
+/* Modal and overlay improvements */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  z-index: 50;
+  overflow-y: auto;
+}
+
+.modal-content {
+  position: relative;
+  width: 100%;
+  max-width: 80rem;
+  max-height: calc(100vh - 4rem);
+  margin: 2rem auto;
+  background: rgba(17, 24, 39, 0.95);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(75, 85, 99, 0.5);
+  border-radius: 1rem;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  overflow-y: auto;
+}
+
+/* Prevent scroll jump */
+body.modal-open {
+  overflow: hidden;
+  padding-right: 0px;
+}
+
 
