@@ -2,7 +2,7 @@ from typing import List, Optional, Dict, Any
 from datetime import datetime
 from ..database import get_database, is_connected
 from ..database.memory_db import memory_db
-from ..models.interview_models import InterviewSession, InterviewSummary
+from ..models.interview_models import InterviewSession, InterviewSummary, get_ist_now
 from ..models.user_models import User
 import uuid
 import logging
@@ -21,12 +21,16 @@ class InterviewService:
             id=session_id,  # Set the MongoDB _id to the same value as session_id
             session_id=session_id,
             user_id=str(user.id),
-            interviewer_type=session_data["interviewer_type"],            difficulty=session_data["difficulty"],
+            interviewer_type=session_data["interviewer_type"],
+            difficulty=session_data["difficulty"],
             job_description=session_data["job_description"],
             resume_text=session_data["resume_text"],
             questions=session_data.get("questions", []),
-            created_at=datetime.utcnow(),
-            updated_at=datetime.utcnow()
+            duration_minutes=session_data.get("duration_minutes", 30),
+            time_limit_enabled=session_data.get("time_limit_enabled", True),
+            # Don't set started_at here - it will be set when user actually starts
+            created_at=get_ist_now(),
+            updated_at=get_ist_now()
         )
         
         try:
@@ -126,6 +130,93 @@ class InterviewService:
                 return True
         
         return False
+
+    async def mark_interview_started(self, session_id: str, user_id: str) -> bool:
+        """Mark interview as started with current timestamp"""
+        try:
+            start_time = get_ist_now()
+            
+            if is_connected():
+                # Use MongoDB
+                db = get_database()
+                sessions_collection = db.interview_sessions
+                
+                result = await sessions_collection.update_one(
+                    {"session_id": session_id, "user_id": user_id},
+                    {
+                        "$set": {
+                            "started_at": start_time,
+                            "updated_at": start_time
+                        }
+                    }
+                )
+                return result.modified_count > 0           
+            else:
+                # Use in-memory database
+                session_data = memory_db.find_session(session_id, user_id)
+                if session_data:
+                    session_data["started_at"] = start_time
+                    session_data["updated_at"] = start_time
+                    return True
+            return False
+        except Exception as e:
+            logger.error(f"Error marking interview as started: {str(e)}")
+            return False
+
+    async def complete_interview(self, session_id: str, user_id: str, time_left_minutes: int = 0) -> bool:
+        """Mark interview as completed and calculate minutes taken"""
+        try:
+            logger.info(f"Completing interview {session_id} for user {user_id}")
+            
+            # Get the session to check duration
+            session = await self.get_session(session_id, user_id)
+            if not session:
+                logger.error(f"Session {session_id} not found for user {user_id}")
+                return False            # Calculate minutes taken: original_duration - time_left
+            original_duration = session.duration_minutes
+            if not original_duration:
+                # Fallback: calculate based on interview parameters
+                num_questions = len(session.questions) or 5
+                # Simple calculation: 3-5 minutes per question + buffer
+                original_duration = max(20, min(60, num_questions * 4 + 10))
+                logger.warning(f"No duration_minutes set for session {session_id}, calculated {original_duration} minutes based on {num_questions} questions")
+            
+            minutes_taken = original_duration - time_left_minutes
+            
+            logger.info(f"Interview took {minutes_taken} minutes (original: {original_duration}, time left: {time_left_minutes})")
+            
+            if is_connected():
+                # Use MongoDB
+                db = get_database()
+                sessions_collection = db.interview_sessions
+                
+                update_data = {
+                    "completed": True,
+                    "minutes_taken": minutes_taken,
+                    "updated_at": get_ist_now()
+                }
+                
+                logger.info(f"Updating MongoDB with data: {update_data}")
+                
+                result = await sessions_collection.update_one(
+                    {"session_id": session_id, "user_id": user_id},
+                    {"$set": update_data}
+                )
+                
+                logger.info(f"MongoDB update result: modified_count={result.modified_count}, matched_count={result.matched_count}")
+                return result.modified_count > 0
+            else:
+                # Use in-memory database
+                session_data = memory_db.find_session(session_id, user_id)
+                if session_data:
+                    session_data["completed"] = True
+                    session_data["minutes_taken"] = minutes_taken
+                    session_data["updated_at"] = get_ist_now()
+                    return True
+            return False
+        except Exception as e:
+            logger.error(f"Error completing interview: {str(e)}")
+            return False
 
     async def update_session_completion(self, session_id: str, user_id: str, completed: bool) -> bool:
         """Update session completion status"""

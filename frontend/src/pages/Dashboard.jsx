@@ -10,13 +10,16 @@ import {
   Eye,
   Trash2,
   Plus,
-  Sparkles,
-  Zap,
   Trophy,
-  Play
+  Play,
+  Zap,
+  Search,
+  Filter,
+  X
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { interviewAPI } from '../services/api';
+import Pagination from '../components/Pagination';
 
 const Dashboard = () => {
   const [sessions, setSessions] = useState([]);
@@ -27,6 +30,15 @@ const Dashboard = () => {
     completed_sessions: 0,
     interviewer_breakdown: {}
   });
+
+  // Pagination and filtering states
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(15);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all'); // all, completed, in_progress
+  const [typeFilter, setTypeFilter] = useState('all'); // all, hr, tech_lead, behavioral
+  const [dateFilter, setDateFilter] = useState('all'); // all, today, week, month
+  const [showFilters, setShowFilters] = useState(false);
   useEffect(() => {
     const loadSessions = async () => {
       try {
@@ -114,6 +126,98 @@ const Dashboard = () => {
       </div>
     );
   }
+
+  // Filtering and pagination logic
+  const filterSessions = (sessions) => {
+    return sessions.filter(session => {
+      // Search filter
+      if (searchTerm) {
+        const searchLower = searchTerm.toLowerCase();
+        const matchesSearch = 
+          session.interviewer_type.toLowerCase().includes(searchLower) ||
+          session.session_id.toLowerCase().includes(searchLower) ||
+          formatDate(session.created_at).toLowerCase().includes(searchLower);
+        if (!matchesSearch) return false;
+      }
+
+      // Status filter
+      if (statusFilter !== 'all') {
+        if (statusFilter === 'completed' && !session.completed) return false;
+        if (statusFilter === 'in_progress' && session.completed) return false;
+      }
+
+      // Type filter
+      if (typeFilter !== 'all' && session.interviewer_type !== typeFilter) return false;
+
+      // Date filter
+      if (dateFilter !== 'all') {
+        const sessionDate = new Date(session.created_at);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);        switch (dateFilter) {
+          case 'today': {
+            const todayEnd = new Date(today);
+            todayEnd.setHours(23, 59, 59, 999);
+            if (sessionDate < today || sessionDate > todayEnd) return false;
+            break;
+          }
+          case 'week': {
+            const weekAgo = new Date(today);
+            weekAgo.setDate(today.getDate() - 7);
+            if (sessionDate < weekAgo) return false;
+            break;
+          }
+          case 'month': {
+            const monthAgo = new Date(today);
+            monthAgo.setMonth(today.getMonth() - 1);
+            if (sessionDate < monthAgo) return false;
+            break;
+          }
+        }
+      }
+
+      return true;
+    });
+  };
+
+  const filteredSessions = filterSessions(sessions);
+  const totalPages = Math.ceil(filteredSessions.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const currentSessions = filteredSessions.slice(startIndex, endIndex);
+
+  const handlePageChange = (page) => {
+    setCurrentPage(page);
+  };
+
+  const handleSearchChange = (e) => {
+    setSearchTerm(e.target.value);
+    setCurrentPage(1); // Reset to first page when searching
+  };
+
+  const handleFilterChange = (filterType, value) => {
+    switch (filterType) {
+      case 'status':
+        setStatusFilter(value);
+        break;
+      case 'type':
+        setTypeFilter(value);
+        break;
+      case 'date':
+        setDateFilter(value);
+        break;
+    }
+    setCurrentPage(1); // Reset to first page when filtering
+  };
+
+  const clearAllFilters = () => {
+    setSearchTerm('');
+    setStatusFilter('all');
+    setTypeFilter('all');
+    setDateFilter('all');
+    setCurrentPage(1);
+  };
+
+  const hasActiveFilters = searchTerm || statusFilter !== 'all' || typeFilter !== 'all' || dateFilter !== 'all';
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-gray-900 relative overflow-hidden">
@@ -226,14 +330,121 @@ const Dashboard = () => {
           </div>
         )}      {/* Recent Sessions */}
       <div className="glass-card animate-fadeInUp" style={{ animationDelay: '0.8s' }}>
-        <div className="flex justify-between items-center mb-8">
+        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 mb-8">
           <h2 className="text-2xl font-bold text-white flex items-center">
             <BarChart3 className="h-7 w-7 mr-3 text-cyan-400 animate-pulse" />
             <span className="bg-gradient-to-r from-cyan-400 to-purple-400 bg-clip-text text-transparent">
-              Recent Interview Sessions
+              Interview Sessions
             </span>
+            {filteredSessions.length !== sessions.length && (
+              <span className="ml-3 text-sm text-gray-400">
+                ({filteredSessions.length} of {sessions.length})
+              </span>
+            )}
           </h2>
+          
+          {/* Search and Filter Controls */}
+          {sessions.length > 0 && (
+            <div className="flex flex-col sm:flex-row gap-4 w-full lg:w-auto">
+              {/* Search Bar */}
+              <div className="relative">
+                <Search className="h-5 w-5 text-gray-400 absolute left-3 top-1/2 transform -translate-y-1/2" />
+                <input
+                  type="text"
+                  placeholder="Search sessions..."
+                  value={searchTerm}
+                  onChange={handleSearchChange}
+                  className="glass-input pl-10 pr-4 py-2 min-w-[250px] bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:border-cyan-400/50 focus:ring-1 focus:ring-cyan-400/30 transition-all duration-200"
+                />
+                {searchTerm && (
+                  <button
+                    onClick={() => handleSearchChange({ target: { value: '' } })}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white transition-colors"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+
+              {/* Filter Toggle */}
+              <button
+                onClick={() => setShowFilters(!showFilters)}
+                className={`glass-button flex items-center space-x-2 px-4 py-2 ${
+                  hasActiveFilters ? 'bg-gradient-to-r from-cyan-500/30 to-purple-500/30' : 'bg-white/10'
+                } hover:bg-white/20 transition-all duration-200`}
+              >
+                <Filter className="h-5 w-5" />
+                <span>Filters</span>
+                {hasActiveFilters && (
+                  <span className="ml-2 px-2 py-1 text-xs bg-cyan-400/20 text-cyan-300 rounded-full">
+                    Active
+                  </span>
+                )}
+              </button>
+
+              {/* Clear Filters */}
+              {hasActiveFilters && (
+                <button
+                  onClick={clearAllFilters}
+                  className="glass-button px-4 py-2 text-red-300 hover:text-red-200 bg-red-500/20 hover:bg-red-500/30 transition-all duration-200"
+                >
+                  Clear All
+                </button>
+              )}
+            </div>
+          )}
         </div>
+
+        {/* Filter Panel */}
+        {showFilters && sessions.length > 0 && (
+          <div className="mb-6 p-6 bg-white/5 rounded-xl border border-white/10 animate-fade-in-up">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {/* Status Filter */}
+              <div className="space-y-2">
+                <label className="text-sm font-semibold text-gray-300">Status</label>                <select
+                  value={statusFilter}
+                  onChange={(e) => handleFilterChange('status', e.target.value)}
+                  className="glass-input w-full px-3 py-2 bg-gray-800/50 border border-white/20 rounded-lg text-white focus:border-cyan-400/50 focus:ring-1 focus:ring-cyan-400/30 transition-all duration-200"
+                  style={{ colorScheme: 'dark' }}
+                >
+                  <option value="all" className="bg-gray-800 text-white">All Status</option>
+                  <option value="completed" className="bg-gray-800 text-white">Completed</option>
+                  <option value="in_progress" className="bg-gray-800 text-white">In Progress</option>
+                </select>
+              </div>
+
+              {/* Type Filter */}
+              <div className="space-y-2">
+                <label className="text-sm font-semibold text-gray-300">Interview Type</label>                <select
+                  value={typeFilter}
+                  onChange={(e) => handleFilterChange('type', e.target.value)}
+                  className="glass-input w-full px-3 py-2 bg-gray-800/50 border border-white/20 rounded-lg text-white focus:border-cyan-400/50 focus:ring-1 focus:ring-cyan-400/30 transition-all duration-200"
+                  style={{ colorScheme: 'dark' }}
+                >
+                  <option value="all" className="bg-gray-800 text-white">All Types</option>
+                  <option value="hr" className="bg-gray-800 text-white">HR Interview</option>
+                  <option value="tech_lead" className="bg-gray-800 text-white">Technical Lead</option>
+                  <option value="behavioral" className="bg-gray-800 text-white">Behavioral</option>
+                </select>
+              </div>
+
+              {/* Date Filter */}
+              <div className="space-y-2">
+                <label className="text-sm font-semibold text-gray-300">Date Range</label>                <select
+                  value={dateFilter}
+                  onChange={(e) => handleFilterChange('date', e.target.value)}
+                  className="glass-input w-full px-3 py-2 bg-gray-800/50 border border-white/20 rounded-lg text-white focus:border-cyan-400/50 focus:ring-1 focus:ring-cyan-400/30 transition-all duration-200"
+                  style={{ colorScheme: 'dark' }}
+                >
+                  <option value="all" className="bg-gray-800 text-white">All Time</option>
+                  <option value="today" className="bg-gray-800 text-white">Today</option>
+                  <option value="week" className="bg-gray-800 text-white">Last 7 Days</option>
+                  <option value="month" className="bg-gray-800 text-white">Last 30 Days</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        )}
 
         {sessions.length === 0 ? (
           <div className="text-center py-16 space-y-6">
@@ -254,87 +465,121 @@ const Dashboard = () => {
               Start First Interview
             </Link>
           </div>
+        ) : filteredSessions.length === 0 ? (
+          <div className="text-center py-16 space-y-6">
+            <div className="w-20 h-20 rounded-full bg-gradient-to-br from-gray-500/20 to-gray-600/20 flex items-center justify-center mx-auto">
+              <Search className="h-10 w-10 text-gray-400" />
+            </div>
+            <div className="space-y-3">
+              <h3 className="text-xl font-bold text-white">No matching sessions</h3>
+              <p className="text-gray-300 max-w-md mx-auto leading-relaxed">
+                No interview sessions match your current filters. Try adjusting your search or filter criteria.
+              </p>
+            </div>
+            <button
+              onClick={clearAllFilters}
+              className="glass-button group bg-gradient-to-r from-gray-500/20 to-gray-600/20 hover:from-gray-400/30 hover:to-gray-500/30 inline-flex items-center"
+            >
+              <X className="h-5 w-5 mr-2" />
+              Clear Filters
+            </button>
+          </div>
         ) : (
-          <div className="overflow-x-auto rounded-2xl border border-white/10">
-            <table className="w-full">
-              <thead>
-                <tr className="bg-gradient-to-r from-slate-800/50 to-gray-800/50 border-b border-white/10">
-                  <th className="text-left py-4 px-6 font-semibold text-cyan-300">Interviewer Type</th>
-                  <th className="text-left py-4 px-6 font-semibold text-cyan-300">Date</th>
-                  <th className="text-left py-4 px-6 font-semibold text-cyan-300">Questions</th>
-                  <th className="text-left py-4 px-6 font-semibold text-cyan-300">Status</th>
-                  <th className="text-left py-4 px-6 font-semibold text-cyan-300">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-white/10">
-                {sessions.map((session, index) => (
-                  <tr 
-                    key={session.session_id} 
-                    className="hover:bg-white/5 transition-all duration-300 group animate-fadeInUp"
-                    style={{ animationDelay: `${0.9 + index * 0.1}s` }}
-                  >
-                    <td className="py-4 px-6">
-                      <div className="flex items-center space-x-3">
-                        <div className="group-hover:scale-110 transition-transform duration-200">
-                          {getInterviewerIcon(session.interviewer_type)}
-                        </div>
-                        <span className={`px-3 py-1 rounded-full text-xs font-semibold transform group-hover:scale-105 transition-all duration-200 ${
-                          getInterviewerColor(session.interviewer_type)
-                        }`}>
-                          {session.interviewer_type.replace('_', ' ').toUpperCase()}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="py-4 px-6 text-gray-300 font-medium">
-                      {formatDate(session.created_at)}
-                    </td>
-                    <td className="py-4 px-6 text-gray-300 font-medium">
-                      <span className="px-2 py-1 rounded-lg bg-white/10 text-white">
-                        {session.answered_questions}/{session.total_questions}
-                      </span>
-                    </td>
-                    <td className="py-4 px-6">
-                      <span className={`px-3 py-1 rounded-full text-xs font-semibold transform group-hover:scale-105 transition-all duration-200 ${
-                        session.completed 
-                          ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-400/30' 
-                          : 'bg-yellow-500/20 text-yellow-300 border border-yellow-400/30'                      }`}>
-                        {session.completed ? 'Completed' : 'In Progress'}
-                      </span>
-                    </td>
-                    <td className="py-4 px-6">
-                      <div className="flex items-center space-x-3">
-                        {session.completed ? (
-                          <Link
-                            to={`/results/${session.session_id}`}
-                            className="glass-button-sm group bg-gradient-to-r from-emerald-500/20 to-teal-500/20 hover:from-emerald-400/30 hover:to-teal-400/30"
-                            title="View Results"
-                          >
-                            <Eye className="h-4 w-4 group-hover:animate-pulse" />
-                          </Link>
-                        ) : (
-                          <Link
-                            to={`/interview/${session.session_id}`}
-                            className="glass-button-sm group bg-gradient-to-r from-blue-500/20 to-indigo-500/20 hover:from-blue-400/30 hover:to-indigo-400/30"
-                            title="Continue Interview"
-                          >
-                            <Play className="h-4 w-4 group-hover:animate-bounce" />
-                          </Link>
-                        )}
-                        <button
-                          onClick={() => deleteSession(session.session_id)}
-                          className="text-red-600 hover:text-red-700 p-1"
-                          title="Delete Session"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </div>
-                    </td>
+          <>
+            {/* Sessions Table */}
+            <div className="overflow-x-auto rounded-2xl border border-white/10 mb-6">
+              <table className="w-full">
+                <thead>
+                  <tr className="bg-gradient-to-r from-slate-800/50 to-gray-800/50 border-b border-white/10">
+                    <th className="text-left py-4 px-6 font-semibold text-cyan-300">Interviewer Type</th>
+                    <th className="text-left py-4 px-6 font-semibold text-cyan-300">Date</th>
+                    <th className="text-left py-4 px-6 font-semibold text-cyan-300">Questions</th>
+                    <th className="text-left py-4 px-6 font-semibold text-cyan-300">Status</th>
+                    <th className="text-left py-4 px-6 font-semibold text-cyan-300">Actions</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>        )}
-        </div>
+                </thead>
+                <tbody className="divide-y divide-white/10">
+                  {currentSessions.map((session, index) => (
+                    <tr 
+                      key={session.session_id} 
+                      className="hover:bg-white/5 transition-all duration-300 group animate-fadeInUp"
+                      style={{ animationDelay: `${0.9 + index * 0.1}s` }}
+                    >
+                      <td className="py-4 px-6">
+                        <div className="flex items-center space-x-3">
+                          <div className="group-hover:scale-110 transition-transform duration-200">
+                            {getInterviewerIcon(session.interviewer_type)}
+                          </div>
+                          <span className={`px-3 py-1 rounded-full text-xs font-semibold transform group-hover:scale-105 transition-all duration-200 ${
+                            getInterviewerColor(session.interviewer_type)
+                          }`}>
+                            {session.interviewer_type.replace('_', ' ').toUpperCase()}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="py-4 px-6 text-gray-300 font-medium">
+                        {formatDate(session.created_at)}
+                      </td>
+                      <td className="py-4 px-6 text-gray-300 font-medium">
+                        <span className="px-2 py-1 rounded-lg bg-white/10 text-white">
+                          {session.answered_questions}/{session.total_questions}
+                        </span>
+                      </td>
+                      <td className="py-4 px-6">
+                        <span className={`px-3 py-1 rounded-full text-xs font-semibold transform group-hover:scale-105 transition-all duration-200 ${
+                          session.completed 
+                            ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-400/30' 
+                            : 'bg-yellow-500/20 text-yellow-300 border border-yellow-400/30'
+                        }`}>
+                          {session.completed ? 'Completed' : 'In Progress'}
+                        </span>
+                      </td>
+                      <td className="py-4 px-6">
+                        <div className="flex items-center space-x-3">
+                          {session.completed ? (
+                            <Link
+                              to={`/results/${session.session_id}`}
+                              className="glass-button-sm group bg-gradient-to-r from-emerald-500/20 to-teal-500/20 hover:from-emerald-400/30 hover:to-teal-400/30"
+                              title="View Results"
+                            >
+                              <Eye className="h-4 w-4 group-hover:animate-pulse" />
+                            </Link>
+                          ) : (
+                            <Link
+                              to={`/interview/${session.session_id}`}
+                              className="glass-button-sm group bg-gradient-to-r from-blue-500/20 to-indigo-500/20 hover:from-blue-400/30 hover:to-indigo-400/30"
+                              title="Continue Interview"
+                            >
+                              <Play className="h-4 w-4 group-hover:animate-bounce" />
+                            </Link>
+                          )}
+                          <button
+                            onClick={() => deleteSession(session.session_id)}
+                            className="text-red-600 hover:text-red-700 p-1"
+                            title="Delete Session"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>            {/* Pagination */}
+            {totalPages > 1 && (
+              <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                totalItems={filteredSessions.length}
+                onPageChange={handlePageChange}
+                startIndex={startIndex}
+                endIndex={endIndex}
+              />
+            )}
+          </>
+        )}
+      </div>
 
         {/* Pro Tips */}
         <div className="glass-card bg-gradient-to-r from-blue-500/10 to-purple-500/10 border-blue-500/20 animate-fade-in-up animation-delay-800">

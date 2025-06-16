@@ -15,17 +15,10 @@ const InterviewSession = () => {
   const [currentAnswer, setCurrentAnswer] = useState('');
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [timerActive, setTimerActive] = useState(true);  const [interviewDuration, setInterviewDuration] = useState(30);  const answerRef = useRef(null);
+  const [timerActive, setTimerActive] = useState(true);
+  const [interviewDuration, setInterviewDuration] = useState(30);
+  const answerRef = useRef(null);
   const enhancedLiveSpeechRef = useRef(null);
-  const sessionRef = useRef(null);
-  const navigateRef = useRef(navigate);
-  const timerRef = useRef(null);
-
-  // Keep refs up to date
-  useEffect(() => {
-    sessionRef.current = session;
-    navigateRef.current = navigate;
-  }, [session, navigate]);
 
   useEffect(() => {
     const fetchSessionData = async () => {
@@ -71,11 +64,12 @@ const InterviewSession = () => {
     if (sessionId) {
       fetchSessionData();
     }
-  }, [sessionId, navigate]);  // Helper function to complete interview and navigate to results
-  const completeInterviewAndNavigate = useCallback(async (timeLeftMinutes = 0, delay = 2000) => {
+  }, [sessionId, navigate]);
+
+  // Helper function to complete interview and navigate to results
+  const completeInterviewAndNavigate = useCallback(async (delay = 2000) => {
     try {
-      console.log(`Completing interview with ${timeLeftMinutes} minutes left`);
-      await interviewAPI.completeInterview(sessionId, timeLeftMinutes);
+      await interviewAPI.completeInterview(sessionId);
       setTimeout(() => {
         navigate(`/results/${sessionId}`);
       }, delay);
@@ -161,12 +155,11 @@ const InterviewSession = () => {
       if (recordingData) {
         await uploadRecording(recordingData);
         enhancedLiveSpeechRef.current?.clearRecording();
-      }      if (response.completed) {
+      }
+      
+      if (response.completed) {
         toast.success('Interview completed! Redirecting to results...');
-        // Get actual time left from timer
-        const timeLeftMinutes = timerRef.current?.getCurrentTimeLeftMinutes() || 0;
-        console.log(`Interview completed - Time left: ${timeLeftMinutes} minutes`);
-        await completeInterviewAndNavigate(timeLeftMinutes);
+        await completeInterviewAndNavigate();
       }
     } catch (error) {
       console.error('Error submitting answer:', error);
@@ -174,21 +167,21 @@ const InterviewSession = () => {
     } finally {
       setSubmitting(false);
     }
-  };  // Stable timer callback using refs - never changes
+  };
+
+  // Stable timer callback using useCallback with no changing dependencies
   const handleTimeUp = useCallback(async () => {
     setTimerActive(false);
     toast.error('Time\'s up! Auto-submitting your current answer...');
     
     try {
-      // Get current answer value at execution time
-      const answerToSubmit = (answerRef.current?.value || '').trim() || "No answer provided - time expired";
+      const answerToSubmit = currentAnswer.trim() || "No answer provided - time expired";
       
       const response = await interviewAPI.submitAnswer({
         session_id: sessionId,
         answer: answerToSubmit
       });
       
-      const currentSession = sessionRef.current;
       setSession(prev => ({
         ...prev,
         answers: [...prev.answers, answerToSubmit],
@@ -201,47 +194,18 @@ const InterviewSession = () => {
       
       const recordingData = enhancedLiveSpeechRef.current?.getLastRecordingData();
       if (recordingData) {
-        // Call uploadRecording directly without dependency
-        try {
-          const base64Audio = await convertBlobToBase64(recordingData.audioBlob);
-          
-          const uploadData = {
-            session_id: sessionId,
-            question_index: currentSession?.current_question || 0,
-            audio_data: base64Audio,
-            duration: Number(recordingData.duration) || 0,
-            transcript: recordingData.transcript || '',
-            file_size: Number(recordingData.audioBlob.size) || 0,
-            mime_type: recordingData.audioBlob.type || 'audio/webm'
-          };
-
-          await interviewAPI.saveRecording(uploadData);
-        } catch (uploadError) {
-          console.error('Error uploading recording:', uploadError);
-        }
-        
+        await uploadRecording(recordingData);
         enhancedLiveSpeechRef.current?.clearRecording();
       }
 
       toast.success('Interview completed due to time limit. Redirecting to results...');
-        // Complete interview and navigate directly without dependency
-      try {
-        await interviewAPI.completeInterview(sessionId, 0); // 0 minutes left - time expired
-        setTimeout(() => {
-          navigateRef.current(`/results/${sessionId}`);
-        }, 3000);
-      } catch (error) {
-        console.error('Error completing interview:', error);
-        setTimeout(() => {
-          navigateRef.current(`/results/${sessionId}`);
-        }, 3000);
-      }
+      await completeInterviewAndNavigate(3000);
       
     } catch (error) {
       console.error('Error auto-submitting on timeout:', error);
       toast.error('Failed to auto-submit. Please submit manually.');
     }
-  }, [sessionId]); // Only sessionId dependency
+  }, [sessionId]); // Only sessionId as dependency
 
   const handleTranscriptionUpdate = (text) => {
     setCurrentAnswer(text);
@@ -291,10 +255,11 @@ const InterviewSession = () => {
         <div className="floating-orb bg-gradient-to-r from-cyan-400/20 to-purple-500/20 w-72 h-72 -top-36 -left-36"></div>
         <div className="floating-orb bg-gradient-to-r from-purple-500/20 to-pink-500/20 w-96 h-96 -top-48 -right-48 animation-delay-2000"></div>
         <div className="floating-orb bg-gradient-to-r from-blue-500/20 to-cyan-400/20 w-64 h-64 bottom-0 left-1/4 animation-delay-4000"></div>
-      </div>      {/* Interview Timer */}
+      </div>
+
+      {/* Interview Timer */}
       {session && session.time_limit_enabled !== false && timerActive && !session.completed && (
         <InterviewTimer
-          ref={timerRef}
           durationMinutes={interviewDuration}
           onTimeUp={handleTimeUp}
           isActive={timerActive}

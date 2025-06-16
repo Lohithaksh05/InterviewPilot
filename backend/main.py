@@ -7,7 +7,15 @@ from app.routes.agents import router as agents_router
 from app.routes.resume import router as resume_router
 from app.routes.auth import router as auth_router
 from app.routes.debug import router as debug_router
+print("DEBUG: Importing templates router...")
+from app.routes.templates import router as templates_router
+print("DEBUG: Templates router imported successfully")
+
+print("DEBUG: Importing voice analysis router...")
+from app.routes.voice_analysis import router as voice_analysis_router
+print("DEBUG: Voice analysis router imported successfully")
 from app.services.gemini_service import GeminiService
+from app.models.template_models import JobRole
 from decouple import config
 import os
 
@@ -46,11 +54,21 @@ app.add_middleware(
 )
 
 # Include routers
+print("DEBUG: Including auth router...")
 app.include_router(auth_router, prefix="/api/auth", tags=["authentication"])
+print("DEBUG: Including interview router...")
 app.include_router(interview_router, prefix="/api/interview", tags=["interview"])
+print("DEBUG: Including agents router...")
 app.include_router(agents_router, prefix="/api/agents", tags=["agents"])
+print("DEBUG: Including resume router...")
 app.include_router(resume_router, prefix="/api/resume", tags=["resume"])
+print("DEBUG: Including templates router...")
+app.include_router(templates_router, prefix="/api/templates", tags=["templates"])
+print("DEBUG: Including voice analysis router...")
+app.include_router(voice_analysis_router, prefix="/api/voice", tags=["voice-analysis"])
+print("DEBUG: Including debug router...")
 app.include_router(debug_router, prefix="/api/debug", tags=["debug"])
+print("DEBUG: All routers included successfully")
 
 # Database event handlers
 @app.on_event("startup")
@@ -68,6 +86,28 @@ async def root():
 @app.get("/health")
 async def health_check():
     return {"status": "healthy"}
+
+@app.get("/api/test")
+async def test_endpoint():
+    return {"message": "Direct test endpoint working", "status": "success"}
+
+@app.get("/api/job-roles")
+async def get_job_roles():
+    """Get all available job roles"""
+    try:
+        job_roles = [
+            {
+                "value": role.value,
+                "label": role.value.replace("_", " ").title()
+            }
+            for role in JobRole
+        ]
+        return {
+            "job_roles": job_roles,
+            "count": len(job_roles)
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch job roles: {str(e)}")
 
 if __name__ == "__main__":
     # Get port from environment variable (Render uses PORT=10000)

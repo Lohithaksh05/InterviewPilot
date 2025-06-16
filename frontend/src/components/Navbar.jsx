@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { BookOpen, BarChart3, User, LogOut, LogIn, Menu, X } from 'lucide-react';
+import { BookOpen, BarChart3, User, LogOut, LogIn, Menu, X, FileText, TrendingUp, Mic } from 'lucide-react';
 import { authAPI } from '../services/api';
 import toast from 'react-hot-toast';
 
@@ -116,9 +116,7 @@ const Navbar = () => {
                 >
                   <BookOpen className="h-5 w-5 group-hover:animate-pulse" />
                   <span>Start Interview</span>
-                </Link>
-
-                <Link
+                </Link>                <Link
                   to="/dashboard"
                   className={`flex items-center space-x-2 px-4 py-3 rounded-2xl text-sm font-semibold transition-all duration-500 group ${
                     isActive('/dashboard')
@@ -128,6 +126,29 @@ const Navbar = () => {
                 >
                   <BarChart3 className="h-5 w-5 group-hover:animate-pulse" />
                   <span>Dashboard</span>
+                </Link>
+
+                <Link
+                  to="/templates"
+                  className={`flex items-center space-x-2 px-4 py-3 rounded-2xl text-sm font-semibold transition-all duration-500 group ${
+                    isActive('/templates')
+                      ? 'text-blue-300 bg-gradient-to-r from-blue-500/20 to-cyan-500/20 border border-blue-400/40 shadow-lg shadow-blue-500/20'
+                      : 'text-gray-300 hover:text-blue-300 hover:bg-gradient-to-r hover:from-blue-500/10 hover:to-cyan-500/10 hover:border hover:border-blue-400/30 hover:shadow-md'
+                  }`}
+                >
+                  <FileText className="h-5 w-5 group-hover:animate-pulse" />                  <span>Templates</span>
+                </Link>
+
+                <Link
+                  to="/voice-analysis"
+                  className={`flex items-center space-x-2 px-4 py-3 rounded-2xl text-sm font-semibold transition-all duration-500 group ${
+                    isActive('/voice-analysis')
+                      ? 'text-pink-300 bg-gradient-to-r from-pink-500/20 to-purple-500/20 border border-pink-400/40 shadow-lg shadow-pink-500/20'
+                      : 'text-gray-300 hover:text-pink-300 hover:bg-gradient-to-r hover:from-pink-500/10 hover:to-purple-500/10 hover:border hover:border-pink-400/30 hover:shadow-md'
+                  }`}
+                >
+                  <Mic className="h-5 w-5 group-hover:animate-pulse" />
+                  <span>Voice</span>
                 </Link>
               </>
             )}
@@ -213,9 +234,7 @@ const Navbar = () => {
                   >
                     <BookOpen className="h-5 w-5" />
                     <span>Start Interview</span>
-                  </Link>
-
-                  <Link
+                  </Link>                  <Link
                     to="/dashboard"
                     onClick={closeMobileMenu}
                     className={`flex items-center space-x-2 px-3 py-2 rounded-md text-base font-medium transition-colors ${
@@ -226,6 +245,31 @@ const Navbar = () => {
                   >
                     <BarChart3 className="h-5 w-5" />
                     <span>Dashboard</span>
+                  </Link>
+
+                  <Link
+                    to="/templates"
+                    onClick={closeMobileMenu}
+                    className={`flex items-center space-x-2 px-3 py-2 rounded-md text-base font-medium transition-colors ${
+                      isActive('/templates')
+                        ? 'text-primary-400 bg-gray-800/80'
+                        : 'text-gray-300 hover:text-white hover:bg-gray-800/50'
+                    }`}
+                  >
+                    <FileText className="h-5 w-5" />                    <span>Templates</span>
+                  </Link>
+
+                  <Link
+                    to="/voice-analysis"
+                    onClick={closeMobileMenu}
+                    className={`flex items-center space-x-2 px-3 py-2 rounded-md text-base font-medium transition-colors ${
+                      isActive('/voice-analysis')
+                        ? 'text-primary-400 bg-gray-800/80'
+                        : 'text-gray-300 hover:text-white hover:bg-gray-800/50'
+                    }`}
+                  >
+                    <Mic className="h-5 w-5" />
+                    <span>Voice Analysis</span>
                   </Link>
                 </>
               )}

@@ -435,3 +435,79 @@ class GeminiService:
                 "recommendation": "Please try generating the summary again or contact support",
                 "next_steps": ["Review interview recording", "Request manual evaluation if needed"]
             }
+    
+    async def generate_questions_with_template(self, resume_text: str, job_description: str, 
+                                          template: dict, num_questions: int = 5) -> List[str]:
+        """Generate interview questions using template guidelines"""
+        try:
+            # Extract template information
+            key_skills = template.get('key_skills', [])
+            evaluation_criteria = template.get('evaluation_criteria', [])
+            question_distribution = template.get('question_distribution', {})
+            experience_level = template.get('experience_level', 'mid')
+            job_role = template.get('job_role', 'general')
+            
+            # Create skill-focused prompt
+            skills_text = ", ".join(key_skills[:8])  # Limit to top 8 skills
+            criteria_text = ", ".join(evaluation_criteria[:6])  # Limit to top 6 criteria
+            
+            # Calculate question categories based on template distribution
+            total_template_questions = sum(question_distribution.values()) or 10
+            category_prompts = []
+            
+            for category, count in question_distribution.items():
+                if count > 0:
+                    percentage = (count / total_template_questions) * num_questions
+                    if percentage >= 1:
+                        category_prompts.append(f"{int(percentage)} {category} questions")
+            
+            category_breakdown = ", ".join(category_prompts) if category_prompts else f"{num_questions} mixed questions"
+            
+            prompt = f"""
+            You are an expert interviewer for a {job_role.replace('_', ' ').title()} position.
+            Generate {num_questions} interview questions tailored to this specific role.
+            
+            TARGET ROLE: {job_role.replace('_', ' ').title()}
+            EXPERIENCE LEVEL: {experience_level.title()}
+            
+            KEY SKILLS TO ASSESS: {skills_text}
+            
+            EVALUATION CRITERIA: {criteria_text}
+            
+            QUESTION BREAKDOWN: Generate {category_breakdown}
+              CANDIDATE RESUME:
+            {resume_text}
+            
+            {f'''JOB DESCRIPTION:
+            {job_description}
+            ''' if job_description and job_description.strip() else '''ROLE FOCUS:
+            Questions should be tailored to the {job_role.replace('_', ' ').title()} role based on the template guidelines and candidate's resume.
+            '''}
+            
+            INSTRUCTIONS:
+            1. Focus on the KEY SKILLS listed above
+            2. Align questions with the EVALUATION CRITERIA
+            3. Match the {experience_level} experience level
+            4. Make questions role-specific for {job_role.replace('_', ' ')}
+            5. Generate exactly {num_questions} questions
+            6. Each question should end with a question mark
+            7. Mix question types based on the breakdown above
+            
+            Return ONLY a JSON array of strings:
+            ["Question 1?", "Question 2?", "Question 3?", ...]
+            """
+            
+            response = await self._make_request(prompt)
+            questions = self._parse_questions_response(response)
+            
+            if len(questions) != num_questions:
+                logger.warning(f"Template-based generation returned {len(questions)} questions, expected {num_questions}")
+                
+            return questions[:num_questions]  # Ensure we return exactly the requested number
+            
+        except Exception as e:
+            logger.error(f"Error generating questions with template: {str(e)}")
+            # Fallback to standard generation
+            return await self.generate_questions(resume_text, job_description, "hr", "medium", num_questions)
+
+    # ...existing code...

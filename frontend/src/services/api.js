@@ -3,8 +3,6 @@ import axios from 'axios';
 // Use environment variable for API URL, fallback to localhost for development
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
 
-console.log('API Base URL:', API_BASE_URL);
-
 // Create axios instance with default config
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
@@ -17,8 +15,6 @@ const apiClient = axios.create({
 // Request interceptor to add auth token
 apiClient.interceptors.request.use(
   (config) => {
-    console.log(`Making ${config.method?.toUpperCase()} request to:`, config.url);
-    
     // Add authorization header if token exists
     const token = localStorage.getItem('token');
     if (token) {
@@ -127,21 +123,20 @@ export const resumeAPI = {
 };
 
 // Interview API
-export const interviewAPI = {
-  // Start new interview session
-  startInterview: async ({ interviewer_type, job_description, resume_text, num_questions = 5 }) => {
-    const response = await apiClient.post('/interview/start', {
-      interviewer_type,
-      job_description,
-      resume_text,
-      num_questions,
-    });
+export const interviewAPI = {  // Start new interview session
+  startInterview: async (interviewData) => {
+    const response = await apiClient.post('/interview/start', interviewData);
     return response.data;
   },
-
   // Get interview session details
   getSession: async (sessionId) => {
     const response = await apiClient.get(`/interview/session/${sessionId}`);
+    return response.data;
+  },
+
+  // Mark interview session as started
+  startSession: async (sessionId) => {
+    const response = await apiClient.post(`/interview/start-session/${sessionId}`);
     return response.data;
   },
 
@@ -153,10 +148,16 @@ export const interviewAPI = {
     });
     return response.data;
   },
-
   // Get interview summary
   getSummary: async (sessionId) => {
     const response = await apiClient.get(`/interview/summary/${sessionId}`);
+    return response.data;
+  },
+  // Complete interview session
+  completeInterview: async (sessionId, timeLeftMinutes = 0) => {
+    const response = await apiClient.post(`/interview/complete/${sessionId}`, {
+      time_left_minutes: timeLeftMinutes
+    });
     return response.data;
   },
 
@@ -249,13 +250,94 @@ export const healthAPI = {
   },
 };
 
+// Templates API
+export const templatesAPI = {
+  // Get all available templates
+  getTemplates: async () => {
+    const response = await apiClient.get('/templates');
+    return response.data;
+  },
+
+  // Get template by ID
+  getTemplate: async (templateId) => {
+    const response = await apiClient.get(`/templates/${templateId}`);
+    return response.data;
+  },
+
+  // Get templates by job role
+  getTemplatesByRole: async (jobRole) => {
+    const response = await apiClient.get(`/templates/role/${jobRole}`);
+    return response.data;
+  },
+
+  // Customize template
+  customizeTemplate: async (templateId, customizations) => {
+    const response = await apiClient.post(`/templates/${templateId}/customize`, customizations);
+    return response.data;
+  },
+
+  // Generate interview from template
+  generateInterview: async (templateId, { resume_text, job_description }) => {
+    const response = await apiClient.post(`/templates/${templateId}/generate-interview`, {
+      resume_text,
+      job_description
+    });
+    return response.data;
+  },
+
+  // Get available job roles
+  getJobRoles: async () => {
+    const response = await apiClient.get('/job-roles');
+    return response.data;
+  }
+};
+
+// Voice Analysis API
+export const voiceAPI = {
+  // Analyze voice recording
+  analyzeVoice: async ({ recording_id, session_id, question_index, audio_data, transcript, duration }) => {
+    const response = await apiClient.post('/voice/analyze', {
+      recording_id,
+      session_id,
+      question_index,
+      audio_data,
+      transcript,
+      duration
+    });
+    return response.data;
+  },
+
+  // Quick voice analysis
+  quickAnalyze: async ({ transcript, duration }) => {
+    const response = await apiClient.post('/voice/quick-analyze', {
+      transcript,
+      duration
+    });
+    return response.data;
+  },
+
+  // Get coaching tips
+  getCoachingTips: async (category = null) => {
+    const url = category ? `/voice/coaching-tips?category=${category}` : '/voice/coaching-tips';
+    const response = await apiClient.get(url);
+    return response.data;
+  },
+
+  // Get voice patterns for user
+  getMyVoicePatterns: async () => {
+    const response = await apiClient.get('/voice/voice-patterns/me');
+    return response.data;
+  }
+};
+
 // Main API object
-const api = {
-  auth: authAPI,
+const api = {  auth: authAPI,
   resume: resumeAPI,
   interview: interviewAPI,
   agents: agentsAPI,
   health: healthAPI,
+  templates: templatesAPI,
+  voice: voiceAPI,
   // Direct access to axios methods for backward compatibility
   get: apiClient.get,
   post: apiClient.post,

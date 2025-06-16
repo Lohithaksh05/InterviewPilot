@@ -210,6 +210,22 @@
   animation: slideDown 0.5s ease-out;
 }
 
+/* Fade in animations */
+.animate-fade-in-up {
+  animation: fadeInUp 0.6s ease forwards;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 /* Animation Delays */
 .animation-delay-2000 {
   animation-delay: 2s;
@@ -221,6 +237,14 @@
 
 .animation-delay-6000 {
   animation-delay: 6s;
+}
+
+.animation-delay-400 {
+  animation-delay: 0.4s;
+}
+
+.animation-delay-800 {
+  animation-delay: 0.8s;
 }
 
 /* Custom button styles */
@@ -445,6 +469,77 @@
 
 .glass-button-sm:active {
   transform: scale(0.95);
+}
+
+/* Glass Card */
+.glass-card {
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 20px;
+  padding: 32px;
+  margin-bottom: 32px;
+  transition: all 0.3s ease;
+}
+
+.glass-card:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.15);
+  transform: translateY(-2px);
+}
+
+/* Glass Input */
+.glass-input {
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 12px;
+  color: white;
+  outline: none;
+  transition: all 0.3s ease;
+}
+
+.glass-input::placeholder {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.glass-input:focus {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(56, 189, 248, 0.5);
+  box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.1);
+}
+
+/* Select dropdown styling for dark theme */
+.glass-input select {
+  background-color: rgba(31, 41, 55, 0.8);
+  color: white;
+}
+
+.glass-input select option {
+  background-color: #1f2937;
+  color: white;
+  padding: 8px 12px;
+}
+
+.glass-input select option:hover {
+  background-color: #374151;
+}
+
+.glass-input select option:checked {
+  background-color: #4b5563;
+}
+
+/* Dark theme select styling */
+select.glass-input {
+  background-color: rgba(31, 41, 55, 0.8) !important;
+  color: white !important;
+}
+
+select.glass-input option {
+  background-color: #1f2937 !important;
+  color: white !important;
 }
 
 /* Button group for related actions */

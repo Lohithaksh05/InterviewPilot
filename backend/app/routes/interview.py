@@ -27,6 +27,9 @@ except Exception as e:
 async def start_interview(request: dict, current_user: User = Depends(get_current_user)):
     """Start a new interview session"""
     
+    # Debug logging
+    logger.info(f"Received interview request: {request}")
+    
     if not gemini_service or not interview_service:
         raise HTTPException(
             status_code=500,
@@ -38,11 +41,19 @@ async def start_interview(request: dict, current_user: User = Depends(get_curren
         job_description = request.get('job_description', '')
         resume_text = request.get('resume_text', '')
         num_questions = request.get('num_questions', 5)
+        selected_template = request.get('selected_template')  # New: template data
         
-        if not all([interviewer_type, job_description, resume_text]):
+        if not all([interviewer_type, resume_text]):
             raise HTTPException(
                 status_code=400,
-                detail="interviewer_type, job_description, and resume_text are required"
+                detail="interviewer_type and resume_text are required"
+            )
+        
+        # Job description is only required for non-template interviews
+        if not selected_template and not job_description:
+            raise HTTPException(
+                status_code=400,
+                detail="job_description is required when not using a template"
             )
         
         # Validate interviewer type
@@ -65,17 +76,48 @@ async def start_interview(request: dict, current_user: User = Depends(get_curren
         
         # Generate session ID
         session_id = str(uuid.uuid4())
-          # Create interviewer agent and generate questions
-        interviewer = InterviewerFactory.create_interviewer(interviewer_enum, gemini_service)
-        questions = await interviewer.generate_questions(resume_text, job_description, difficulty, num_questions)
-        
-        # Prepare session data
+          # Generate questions - use template if available
+        if selected_template:
+            logger.info(f"Using template: {selected_template.get('name', 'Unknown')} for question generation")
+            
+            # Use template settings instead of user-provided settings
+            template_total_questions = sum(selected_template.get('question_distribution', {}).values()) or num_questions
+            template_primary_interviewer = selected_template.get('interviewer_types', [interviewer_type])[0]
+            
+            # Use template's question count (capped at reasonable limit)
+            actual_num_questions = min(template_total_questions, 15)  # Cap at 15 questions
+            
+            questions = await gemini_service.generate_questions_with_template(
+                resume_text, job_description, selected_template, actual_num_questions
+            )
+            
+            # Use template's primary interviewer type for session
+            try:
+                template_interviewer_enum = InterviewerType(template_primary_interviewer)
+                session_interviewer_type = template_interviewer_enum
+            except ValueError:
+                session_interviewer_type = interviewer_enum  # Fallback to user selection
+                
+        else:
+            logger.info("Using standard question generation (no template)")
+            # Create interviewer agent and generate questions
+            interviewer = InterviewerFactory.create_interviewer(interviewer_enum, gemini_service)
+            questions = await interviewer.generate_questions(resume_text, job_description, difficulty, num_questions)
+            session_interviewer_type = interviewer_enum        # Prepare session data
         session_data = {
-            "interviewer_type": interviewer_enum,
+            "interviewer_type": session_interviewer_type,
             "difficulty": difficulty_enum,
             "job_description": job_description,
             "resume_text": resume_text,
-            "questions": questions
+            "questions": questions,
+            "duration_minutes": request.get('duration_minutes') or (selected_template.get('duration_minutes') if selected_template else None),
+            "time_limit_enabled": True,  # Enable timer by default
+            "template_used": selected_template.get('name') if selected_template else None,
+            "template_settings": {
+                "duration_minutes": selected_template.get('duration_minutes'),
+                "key_skills": selected_template.get('key_skills', []),
+                "evaluation_criteria": selected_template.get('evaluation_criteria', [])
+            } if selected_template else None
         }
         
         # Store session in database
@@ -97,6 +139,40 @@ async def start_interview(request: dict, current_user: User = Depends(get_curren
         raise HTTPException(
             status_code=500,
             detail=f"Error starting interview: {str(e)}"
+        )
+
+@router.post("/start-session/{session_id}")
+async def start_interview_session(session_id: str, current_user: User = Depends(get_current_user)):
+    """Mark interview session as started with current timestamp"""
+    
+    if not interview_service:
+        raise HTTPException(
+            status_code=500,
+            detail="Interview service not available."
+        )
+    
+    try:
+        success = await interview_service.mark_interview_started(session_id, str(current_user.id))
+        
+        if not success:
+            raise HTTPException(
+                status_code=404,
+                detail="Interview session not found or could not be started"
+            )
+        
+        return {
+            "success": True,
+            "message": "Interview session started",
+            "session_id": session_id
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error starting interview session {session_id}: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error starting interview session: {str(e)}"
         )
 
 @router.get("/session/{session_id}")
@@ -198,6 +274,44 @@ async def submit_answer(request: dict, current_user: User = Depends(get_current_
             detail=f"Error submitting answer: {str(e)}"
         )
 
+@router.post("/complete/{session_id}")
+async def complete_interview(session_id: str, request: dict = {}, current_user: User = Depends(get_current_user)):
+    """Complete an interview session and record timing"""
+    
+    if not interview_service:
+        raise HTTPException(
+            status_code=500,
+            detail="Interview service not available."
+        )
+    
+    try:
+        # Get time left from request (in minutes)
+        time_left_minutes = request.get('time_left_minutes', 0)
+        
+        # Mark interview as completed
+        success = await interview_service.complete_interview(session_id, str(current_user.id), time_left_minutes)
+        
+        if not success:
+            raise HTTPException(
+                status_code=404,
+                detail="Interview session not found or could not be completed"
+            )
+        
+        return {
+            "success": True,
+            "message": "Interview completed successfully",
+            "session_id": session_id
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error completing interview {session_id}: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error completing interview: {str(e)}"
+        )
+
 @router.get("/summary/{session_id}")
 async def get_interview_summary(session_id: str, current_user: User = Depends(get_current_user)):
     """Get comprehensive interview summary"""
@@ -245,9 +359,15 @@ async def get_interview_summary(session_id: str, current_user: User = Depends(ge
                     continue
         
         average_score = total_score / valid_scores if valid_scores > 0 else 0
-        
-        # Update session with completion status
+          # Update session with completion status
         await interview_service.update_session_completion(session_id, str(current_user.id), True)
+          # Calculate timing information
+        timing_info = {}
+        if hasattr(session, 'minutes_taken') and session.minutes_taken is not None:
+            timing_info["minutes_taken"] = session.minutes_taken
+            timing_info["duration_formatted"] = f"{session.minutes_taken} minutes"
+        else:
+            timing_info["duration_formatted"] = "N/A"
         
         return {
             "session_id": session_id,
@@ -258,6 +378,7 @@ async def get_interview_summary(session_id: str, current_user: User = Depends(ge
             "average_score": round(average_score, 2),
             "individual_feedback": session.feedback,
             "overall_summary": summary,
+            "timing": timing_info,
             "qa_pairs": [
                 {
                     "question": q,

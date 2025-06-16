@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Brain, Users, BarChart3, ArrowRight, CheckCircle, Star, Sparkles, Zap, Target, Trophy, Rocket, Shield, Award, User, LogOut } from 'lucide-react';
+import { Brain, Users, BarChart3, ArrowRight, CheckCircle, Star, Sparkles, Zap, Target, Trophy, Rocket, Shield, Award, User, LogOut, Mic, Layers, TrendingUp } from 'lucide-react';
 import { authAPI } from '../services/api';
 import toast from 'react-hot-toast';
 
@@ -96,21 +96,34 @@ const Home = () => {
       window.removeEventListener('authStateChanged', handleAuthChange);
       document.removeEventListener('click', handleClickOutside);
     };
-  }, [showUserDropdown]);const features = [
+  }, [showUserDropdown]);  const features = [
     {
       icon: <Users className="h-8 w-8 text-white" />,
       title: "Multi-Agent Interviewers",
-      description: "Practice with AI-powered HR, Technical Lead, and Behavioral interviewers, each with their unique expertise and questioning style."
+      description: "Practice with AI-powered HR, Technical Lead, and Behavioral interviewers, each with their unique expertise and questioning style.",
+      link: "/interview"
     },
     {
       icon: <Brain className="h-8 w-8 text-white" />,
       title: "AI-Powered Feedback",
-      description: "Get detailed, personalized feedback on your answers with specific suggestions for improvement from Google Gemini AI."
+      description: "Get detailed, personalized feedback on your answers with specific suggestions for improvement from Google Gemini AI.",
+      link: "/interview"
+    },    {
+      icon: <Layers className="h-8 w-8 text-white" />,
+      title: "Interview Templates",
+      description: "Choose from pre-built interview templates tailored for specific job roles and industries. Skip the setup and start practicing immediately.",
+      link: "/templates"    },
+    {
+      icon: <Mic className="h-8 w-8 text-white" />,
+      title: "Voice Analysis",
+      description: "Improve your speaking skills with AI-powered voice analysis, speech coaching, and personalized feedback on your communication.",
+      link: "/voice-analysis"
     },
     {
-      icon: <BarChart3 className="h-8 w-8 text-white" />,
-      title: "Performance Analytics",
-      description: "Track your progress with comprehensive analytics, scoring, and recommendations to ace your next interview."
+      icon: <Zap className="h-8 w-8 text-white" />,
+      title: "Real-time Coaching",
+      description: "Get instant feedback during your practice sessions with adaptive questioning and personalized coaching tips.",
+      link: "/interview"
     }
   ];
   const interviewerTypes = [
@@ -331,20 +344,22 @@ const Home = () => {
           <div className="inline-flex items-center space-x-2 bg-gray-800/80 backdrop-blur-sm border border-gray-700 rounded-full px-6 py-2">
             <Star className="h-5 w-5 text-primary-400" />
             <span className="text-sm font-medium text-gray-200">Why Choose InterviewPilot?</span>
-          </div>
-          <h2 className="text-4xl md:text-5xl font-bold text-white">
-            Supercharge Your
+          </div>          <h2 className="text-4xl md:text-5xl font-bold text-white">
+            Complete Interview
             <span className="block text-white bg-clip-text bg-gradient-to-r from-primary-400 to-purple-400">
-              Interview Success
+              Preparation Suite
             </span>
           </h2>
           <p className="text-xl text-gray-300 max-w-3xl mx-auto mb-5">
-            Our AI-powered platform provides realistic interview practice with cutting-edge technology
+            Master every aspect of interview success with our comprehensive AI-powered platform
           </p>
-        </div>        
-        <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto perspective-1000 mt-5">
+        </div>          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-7xl mx-auto perspective-1000 mt-5">
           {features.map((feature, index) => (
-            <div key={index} className="group relative glass-morphism-dark border border-gray-700 rounded-3xl p-8 shadow-xl hover:shadow-2xl hover:border-primary-500/50 transform hover:scale-105 hover:rotate-y-12 transition-all duration-500 overflow-hidden transform-style-3d">
+            <Link
+              key={index} 
+              to={feature.link}
+              className="group relative glass-morphism-dark border border-gray-700 rounded-3xl p-8 shadow-xl hover:shadow-2xl hover:border-primary-500/50 transform hover:scale-105 hover:rotate-y-12 transition-all duration-500 overflow-hidden transform-style-3d cursor-pointer"
+            >
               {/* Animated gradient overlay */}
               <div className="absolute inset-0 bg-gradient-to-br from-primary-500/10 to-purple-600/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500 animate-morphing"></div>
               
@@ -376,17 +391,21 @@ const Home = () => {
                 </h3>                <p className="text-gray-300 leading-relaxed group-hover:text-gray-200 transition-colors duration-300">
                   {feature.description}
                 </p>
-                
-                {/* Feature availability indicator */}
-                <div className="flex items-center space-x-2 opacity-0 group-hover:opacity-100 transition-opacity duration-500">
-                  <CheckCircle className="h-4 w-4 text-green-400 animate-pulse" />
-                  <span className="text-xs text-green-400 font-medium">Available Now</span>
+                  {/* Feature availability indicator */}
+                <div className="flex items-center justify-between opacity-0 group-hover:opacity-100 transition-opacity duration-500">
+                  <div className="flex items-center space-x-2">
+                    <CheckCircle className="h-4 w-4 text-green-400 animate-pulse" />
+                    <span className="text-xs text-green-400 font-medium">Available Now</span>
+                  </div>
+                  <div className="flex items-center space-x-1 text-primary-400">
+                    <span className="text-xs font-medium">Explore</span>
+                    <ArrowRight className="h-3 w-3 group-hover:translate-x-1 transition-transform duration-300" />
+                  </div>
                 </div>
               </div>
-              
-              {/* Holographic border effect */}
+                {/* Holographic border effect */}
               <div className="absolute inset-0 rounded-3xl bg-gradient-to-r from-primary-500 via-purple-500 to-pink-500 opacity-0 group-hover:opacity-10 transition-opacity duration-300 animate-gradient-shift"></div>
-            </div>
+            </Link>
           ))}
         </div>
       </section>      {/* Interviewer Types Section */}

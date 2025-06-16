@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import { 
   BarChart3, 
   TrendingUp, 
@@ -18,6 +18,7 @@ import {
   Pause,
   Volume2,
   Award,
+  Clock,
   Brain,
   ClipboardList
 } from 'lucide-react';
@@ -27,7 +28,9 @@ import jsPDF from 'jspdf';
 
 const Results = () => {
   const { sessionId } = useParams();
-  const navigate = useNavigate();  const [summary, setSummary] = useState(null);
+
+  console.log('Results component loaded, sessionId:', sessionId);
+  const [summary, setSummary] = useState(null);
   const [recordings, setRecordings] = useState({});
   const [loading, setLoading] = useState(true);
   const [audioLoading, setAudioLoading] = useState(false);
@@ -48,20 +51,19 @@ const Results = () => {
     return date.toLocaleString('en-IN', { 
       timeZone: 'Asia/Kolkata' 
     });
-  };const fetchSummary = useCallback(async () => {
+  };  const fetchSummary = useCallback(async () => {
     try {
-      console.log('Fetching summary for sessionId:', sessionId);
       const response = await interviewAPI.getSummary(sessionId);
-      console.log('Summary response:', response);
       setSummary(response);
     } catch (error) {
       console.error('Error fetching summary:', error);
       toast.error(error.message || 'Failed to load interview results');
-      navigate('/dashboard');
+      // Don't automatically redirect - let user see error state
+      setSummary(null);
     } finally {
       setLoading(false);
     }
-  }, [sessionId, navigate]);const fetchRecordings = useCallback(async () => {    try {
+  }, [sessionId]);const fetchRecordings = useCallback(async () => {    try {
       setAudioLoading(true);
       const response = await interviewAPI.getSessionRecordings(sessionId);
       
@@ -110,18 +112,20 @@ const Results = () => {
         bytes[i] = binaryString.charCodeAt(i);
       }
         // Use the recording's MIME type, default to audio/webm
-      const mimeType = recording.mime_type || 'audio/webm';
-      const blob = new Blob([bytes], { type: mimeType });
+      const mimeType = recording.mime_type || 'audio/webm';      const blob = new Blob([bytes], { type: mimeType });
       return URL.createObjectURL(blob);
     } catch (error) {
       console.error('Error creating audio URL:', error);
       return null;
     }
   }, []);
+
   useEffect(() => {
     if (sessionId) {
       fetchSummary();
       fetchRecordings();
+      // Temporarily comment out voice analysis to test
+      // fetchVoiceAnalysis();
     }
   }, [sessionId, fetchSummary, fetchRecordings]);
 
@@ -424,7 +428,7 @@ Recommendation: ${summary?.overall_summary?.recommendation || 'N/A'}
               </Link>
             </div>
           </div>          {/* Overall Score Cards */}
-          <div className="grid md:grid-cols-3 gap-6 animate-fade-in-up animation-delay-200">
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 animate-fade-in-up animation-delay-200">
             {/* Overall Score */}
             <div className="group glass-card relative overflow-hidden transform hover:scale-105 transition-all duration-500 hover:shadow-2xl hover:shadow-cyan-500/25">
               <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/10 to-purple-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
@@ -485,10 +489,29 @@ Recommendation: ${summary?.overall_summary?.recommendation || 'N/A'}
                     <p className="text-sm text-gray-300">Recommendation</p>
                   </div>
                 </div>
-              </div>
-              <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-400 to-indigo-400 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-500"></div>
+              </div>              <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-400 to-indigo-400 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-500"></div>
             </div>
-          </div>          {/* Overall Summary */}
+
+            {/* Time Taken */}
+            <div className="group glass-card relative overflow-hidden transform hover:scale-105 transition-all duration-500 hover:shadow-2xl hover:shadow-purple-500/25">
+              <div className="absolute inset-0 bg-gradient-to-br from-purple-500/10 to-pink-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+              <div className="relative z-10 p-6">
+                <div className="flex items-center space-x-4">
+                  <div className="relative">
+                    <Clock className="h-10 w-10 text-purple-400 group-hover:animate-pulse transition-all duration-300" />
+                    <div className="absolute inset-0 bg-purple-400/20 rounded-full blur-lg animate-ping opacity-75"></div>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-2xl font-bold text-white">
+                      {summary.timing?.duration_formatted || 'N/A'}
+                    </p>
+                    <p className="text-sm text-gray-300">Time Taken</p>
+                  </div>
+                </div>
+              </div>
+              <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-purple-400 to-pink-400 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-500"></div>
+            </div>
+          </div>{/* Overall Summary */}
           {summary.overall_summary && (
             <div className="glass-card animate-fade-in-up animation-delay-400 group transform hover:scale-[1.02] transition-all duration-500">
               <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-purple-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500 rounded-3xl"></div>
@@ -653,12 +676,8 @@ Recommendation: ${summary?.overall_summary?.recommendation || 'N/A'}
                             </div>
                             <audio 
                               controls 
-                              src={audioSrc}
-                              className="w-full h-12 rounded-lg bg-black/20 filter-glass"
+                              src={audioSrc}                              className="w-full h-12 rounded-lg bg-black/20 filter-glass"
                               preload="metadata"
-                              onLoadStart={() => console.log(`Audio ${index + 1}: loadstart`)}
-                              onLoadedMetadata={(e) => console.log(`Audio ${index + 1}: loadedmetadata, duration:`, e.target.duration)}
-                              onCanPlay={() => console.log(`Audio ${index + 1}: canplay`)}
                               onError={(e) => {
                                 console.error(`Audio ${index + 1} error:`, e);
                                 toast.error(`Failed to load audio for question ${index + 1}`);
@@ -740,7 +759,24 @@ Recommendation: ${summary?.overall_summary?.recommendation || 'N/A'}
                 })}
               </div>
             </div>
-          )}      {/* Next Steps */}
+          )}          {/* Voice Analysis Section - Temporarily Commented Out */}
+          {/* 
+          <div className="glass-card animate-fadeInUp bg-gradient-to-br from-pink-500/10 to-purple-500/10" style={{ animationDelay: '1.1s' }}>
+            <h3 className="text-2xl font-bold text-white mb-6 flex items-center">
+              <div className="w-10 h-10 rounded-full bg-gradient-to-r from-pink-400 to-purple-400 flex items-center justify-center mr-3">
+                🎤
+              </div>
+              <span className="bg-gradient-to-r from-pink-400 to-purple-400 bg-clip-text text-transparent">
+                Voice Analysis
+              </span>
+            </h3>
+            <div className="text-center text-gray-300">
+              Voice analysis feature coming soon!
+            </div>
+          </div>
+          */}
+
+      {/* Next Steps */}
       {summary.overall_summary?.next_steps?.length > 0 && (
         <div className="glass-card animate-fadeInUp bg-gradient-to-br from-indigo-500/10 to-purple-500/10" style={{ animationDelay: '1.2s' }}>
           <h3 className="text-2xl font-bold text-white mb-6 flex items-center">
@@ -779,12 +815,11 @@ Recommendation: ${summary?.overall_summary?.recommendation || 'N/A'}
           to="/interview" 
           className="glass-button group bg-gradient-to-r from-cyan-500/20 to-purple-500/20 hover:from-cyan-400/30 hover:to-purple-400/30"
         >
-          <Play className="h-5 w-5 mr-2 group-hover:animate-bounce" />
-          <span>Start New Interview</span>
+          <Play className="h-5 w-5 mr-2 group-hover:animate-bounce" />          <span>Start New Interview</span>
         </Link>
       </div>
-    </div>
-    </div>
+        </div>
+      </div>
     </div>
   );
 };

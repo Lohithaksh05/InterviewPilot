@@ -2,11 +2,18 @@ from pydantic import BaseModel, Field, ConfigDict
 from typing import List, Optional, Dict, Any
 from typing_extensions import Annotated
 from enum import Enum
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from bson import ObjectId
 from pydantic import GetJsonSchemaHandler
 from pydantic.json_schema import JsonSchemaValue
 from pydantic_core import core_schema
+
+# Indian Standard Time (UTC+5:30)
+IST = timezone(timedelta(hours=5, minutes=30))
+
+def get_ist_now():
+    """Get current time in Indian Standard Time"""
+    return datetime.now(IST)
 
 class PyObjectId(ObjectId):
     @classmethod
@@ -67,8 +74,11 @@ class InterviewSession(BaseModel):
     feedback: List[Dict[str, Any]] = []
     score: Optional[float] = None
     completed: bool = False
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    duration_minutes: Optional[int] = Field(default=None, description="Interview duration in minutes")
+    time_limit_enabled: bool = Field(default=True, description="Whether time limit is enforced")
+    minutes_taken: Optional[int] = Field(default=None, description="Actual minutes taken to complete interview")
+    created_at: datetime = Field(default_factory=get_ist_now)
+    updated_at: datetime = Field(default_factory=get_ist_now)
 
 class Question(BaseModel):
     question: str

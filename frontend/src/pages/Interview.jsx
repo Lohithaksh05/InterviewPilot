@@ -1,14 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Upload, FileText, Briefcase, Users, Brain, Target, Sparkles, Zap, Clock, Star, ChevronRight } from 'lucide-react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { Upload, FileText, Briefcase, Users, Brain, Target, Sparkles, Zap, Clock, Star, ChevronRight, Layers, Settings, BarChart } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { resumeAPI, agentsAPI, interviewAPI } from '../services/api';
+import { resumeAPI, agentsAPI, interviewAPI, templatesAPI } from '../services/api';
+import { calculateInterviewDuration } from '../utils/interviewDuration';
 
 const Interview = () => {
-  const navigate = useNavigate();  const [step, setStep] = useState(1);
+  const navigate = useNavigate();
+  const location = useLocation();const [step, setStep] = useState(0);
   const [loading, setLoading] = useState(false);
   const [interviewerTypes, setInterviewerTypes] = useState([]);
   const [difficultyLevels, setDifficultyLevels] = useState([]);
+  const [templates, setTemplates] = useState([]);
+  const [selectedTemplate, setSelectedTemplate] = useState(null);
   
   // Form data
   const [formData, setFormData] = useState({
@@ -20,11 +24,27 @@ const Interview = () => {
   });
 
   // File upload state
-  const [uploadedFile, setUploadedFile] = useState(null);
-  useEffect(() => {
+  const [uploadedFile, setUploadedFile] = useState(null);  useEffect(() => {
+    // Check if a template was selected from the Templates page
+    if (location.state?.selectedTemplate) {
+      setSelectedTemplate(location.state.selectedTemplate);
+      setStep(1); // Skip template selection step
+      toast.success(`Using ${location.state.selectedTemplate.name} template`);
+    }
+    
+    fetchTemplates();
     fetchInterviewerTypes();
     fetchDifficultyLevels();
-  }, []);
+  }, [location.state]);
+  const fetchTemplates = async () => {
+    try {
+      const response = await templatesAPI.getTemplates();
+      setTemplates(response.templates || []);
+    } catch (error) {
+      console.error('Error fetching templates:', error);
+      toast.error('Failed to load templates');
+    }
+  };
 
   const fetchInterviewerTypes = async () => {
     try {
@@ -80,27 +100,44 @@ const Interview = () => {
       interviewer_type: type
     }));
   };
-
   const startInterview = async () => {
     if (!formData.resume_text.trim()) {
       toast.error('Please upload your resume or enter resume text');
       return;
     }
     
-    if (!formData.job_description.trim()) {
+    // Job description is only required for custom interviews (not template-based)
+    if (!selectedTemplate && !formData.job_description.trim()) {
       toast.error('Please enter the job description');
       return;
     }
     
     if (!formData.interviewer_type) {
       toast.error('Please select an interviewer type');
-      return;
-    }
+      return;    }
 
     setLoading(true);
     try {
-      const response = await interviewAPI.startInterview(formData);
-      toast.success('Interview session started!');
+      // Include selected template in the request
+      const interviewData = {
+        ...formData,
+        selected_template: selectedTemplate,
+        duration_minutes: calculateInterviewDuration({
+          numQuestions: formData.num_questions,
+          difficulty: formData.difficulty,
+          interviewerType: formData.interviewer_type,
+          selectedTemplate: selectedTemplate
+        })
+      };
+      
+      const response = await interviewAPI.startInterview(interviewData);
+      
+      if (selectedTemplate) {
+        toast.success(`Interview started with ${selectedTemplate.name} template!`);
+      } else {
+        toast.success('Interview session started!');
+      }
+      
       navigate(`/interview/${response.session_id}`);
     } catch (error) {
       console.error('Error starting interview:', error);
@@ -127,6 +164,18 @@ const Interview = () => {
     }
   };
 
+  const handleBackToTemplateSelection = () => {
+    setStep(0);
+    setSelectedTemplate(null);
+    // Reset form data that was auto-filled by template
+    setFormData(prev => ({
+      ...prev,
+      interviewer_type: '',
+      difficulty: 'medium',
+      num_questions: 5
+    }));
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-gray-900 relative overflow-hidden">
       {/* Animated Background Elements */}
@@ -146,16 +195,27 @@ const Interview = () => {
                 Setup Your Interview
               </h1>
               <div className="absolute -inset-4 bg-gradient-to-r from-cyan-400/20 to-purple-400/20 blur-xl rounded-3xl opacity-30 animate-pulse"></div>
-            </div>
-            <p className="text-xl text-gray-300 font-medium max-w-2xl mx-auto">
+            </div>            <p className="text-xl text-gray-300 font-medium max-w-2xl mx-auto">
               Upload your resume, add the job description, and choose your AI interviewer for a personalized practice session
             </p>
+              {/* Template Status Indicator */}
+            {selectedTemplate && (
+              <button
+                onClick={() => setStep(0)}
+                className="inline-flex items-center space-x-2 bg-purple-500/20 border border-purple-400/30 rounded-full px-4 py-2 text-purple-300 hover:bg-purple-500/30 hover:border-purple-400/50 transition-all duration-300 transform hover:scale-105"
+                title="Click to change template"
+              >
+                <Layers className="h-4 w-4" />
+                <span className="text-sm font-medium">Using {selectedTemplate.name} template</span>
+                <span className="text-xs text-purple-400 ml-1">(click to change)</span>
+              </button>
+            )}
           </div>
 
           {/* Progress Steps */}
-          <div className="flex justify-center animate-fade-in-up animation-delay-200">
-            <div className="flex items-center space-x-8 glass-card px-8 py-4">
+          <div className="flex justify-center animate-fade-in-up animation-delay-200">            <div className="flex items-center space-x-8 glass-card px-8 py-4">
               {[
+                { num: 0, label: 'Template', icon: Layers },
                 { num: 1, label: 'Resume', icon: FileText },
                 { num: 2, label: 'Job Details', icon: Briefcase },
                 { num: 3, label: 'Interviewer', icon: Users }
@@ -182,7 +242,7 @@ const Interview = () => {
                       {stepInfo.label}
                     </div>
                   </div>
-                  {index < 2 && (
+                  {index < 3 && (
                     <ChevronRight className={`h-5 w-5 transition-colors duration-300 ${
                       step > stepInfo.num ? 'text-cyan-400' : 'text-gray-500'
                     }`} />
@@ -190,7 +250,155 @@ const Interview = () => {
                 </React.Fragment>
               ))}
             </div>
-          </div>          {/* Step 1: Resume Upload */}
+          </div>          {/* Step 0: Template Selection */}
+          {step === 0 && (
+            <div className="glass-card space-y-8 animate-fade-in-up animation-delay-400">
+              <div className="text-center mb-8">
+                <div className="p-4 rounded-2xl bg-gradient-to-br from-purple-500/20 to-pink-500/20 inline-block mb-4">
+                  <Layers className="h-10 w-10 text-purple-400" />
+                </div>
+                <h2 className="text-3xl font-bold text-white mb-2">Choose Your Interview Template</h2>
+                <p className="text-gray-300">Select a specialized template tailored to your target role</p>
+              </div>              <div className="space-y-6">
+                {/* Custom Interview Option */}
+                <div 
+                  onClick={() => {
+                    setSelectedTemplate(null);
+                    setStep(1);
+                  }}
+                  className="group relative bg-gradient-to-br from-cyan-800/50 to-blue-900/50 rounded-2xl p-6 cursor-pointer transition-all duration-300 hover:transform hover:scale-105 hover:shadow-2xl hover:shadow-cyan-500/20"
+                >
+                  <div className="flex items-center space-x-4">
+                    <div className="p-3 rounded-xl bg-gradient-to-br from-cyan-500/20 to-blue-500/20 group-hover:from-cyan-400/30 group-hover:to-blue-400/30 transition-all">
+                      <Sparkles className="h-8 w-8 text-cyan-400 group-hover:text-cyan-300" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="text-xl font-bold text-white group-hover:text-cyan-300 transition-colors mb-2">Custom Interview</h3>
+                      <p className="text-gray-300">Start with a blank template and customize everything yourself</p>
+                    </div>
+                    <ChevronRight className="h-6 w-6 text-cyan-400 group-hover:text-cyan-300 transition-colors" />
+                  </div>
+                  
+                  {/* Hover Effect Overlay */}
+                  <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-cyan-500/10 to-blue-500/10 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
+                </div>
+
+                {/* Template Grid */}
+                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {templates.map((template) => (
+                    <div 
+                      key={template.id}                  onClick={() => {
+                    setSelectedTemplate(template);
+                    
+                    // Auto-fill form data from template
+                    const totalQuestions = Object.values(template.question_distribution || {}).reduce((a, b) => a + b, 0) || 5;
+                    const primaryInterviewer = template.interviewer_types?.[0] || 'hr';
+                    const primaryDifficulty = template.experience_level === 'senior' ? 'hard' : 
+                                            template.experience_level === 'junior' ? 'easy' : 'medium';
+                    
+                    setFormData(prev => ({
+                      ...prev,
+                      interviewer_type: primaryInterviewer,
+                      difficulty: primaryDifficulty,
+                      num_questions: Math.min(totalQuestions, 10) // Cap at 10 questions
+                    }));
+                    
+                    // Skip to Step 1 (Resume Upload) since template provides the settings
+                    setStep(1);
+                  }}
+                      className="group relative bg-gradient-to-br from-gray-800/50 to-gray-900/50 rounded-2xl p-6 cursor-pointer transition-all duration-300 hover:transform hover:scale-105 hover:shadow-2xl hover:shadow-purple-500/20"
+                    >
+                      {/* Template Header */}
+                      <div className="flex items-start justify-between mb-4">
+                        <div className="flex items-center space-x-3">
+                          <div className="p-3 rounded-xl bg-gradient-to-br from-purple-500/20 to-pink-500/20 group-hover:from-purple-400/30 group-hover:to-pink-400/30 transition-all">
+                            <Briefcase className="h-6 w-6 text-purple-400 group-hover:text-purple-300" />
+                          </div>
+                          <div>
+                            <h3 className="text-lg font-bold text-white group-hover:text-purple-300 transition-colors">
+                              {template.name}
+                            </h3>
+                            <p className="text-sm text-gray-400 capitalize">
+                              {template.job_role ? template.job_role.replace(/_/g, ' ') : 'General'}
+                            </p>
+                          </div>
+                        </div>
+                        <ChevronRight className="h-5 w-5 text-gray-500 group-hover:text-purple-400 transition-colors" />
+                      </div>
+
+                      {/* Template Description */}
+                      <p className="text-gray-300 text-sm mb-4 line-clamp-2 leading-relaxed">
+                        {template.description}
+                      </p>
+
+                      {/* Template Stats */}
+                      <div className="grid grid-cols-1 gap-2 mb-4">
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="flex items-center space-x-2 text-gray-400">
+                            <Clock className="h-4 w-4" />
+                            <span>Duration</span>
+                          </span>
+                          <span className="text-white font-medium">
+                            {template.duration_minutes ? template.duration_minutes + ' min' : '60 min'}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="flex items-center space-x-2 text-gray-400">
+                            <Users className="h-4 w-4" />
+                            <span>Level</span>
+                          </span>
+                          <span className="text-white font-medium capitalize">
+                            {template.experience_level || 'Mid'}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Interviewer Types */}
+                      {template.interviewer_types && template.interviewer_types.length > 0 && (
+                        <div className="flex flex-wrap gap-1">
+                          {template.interviewer_types.slice(0, 2).map((type, index) => (
+                            <span 
+                              key={index}
+                              className="px-2 py-1 text-xs rounded-full bg-purple-500/20 text-purple-300"
+                            >
+                              {type.replace(/_/g, ' ')}
+                            </span>
+                          ))}
+                          {template.interviewer_types.length > 2 && (
+                            <span className="px-2 py-1 text-xs rounded-full bg-gray-500/20 text-gray-400">
+                              +{template.interviewer_types.length - 2}
+                            </span>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Hover Effect Overlay */}
+                      <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-purple-500/10 to-pink-500/10 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
+                    </div>
+                  ))}                </div>
+
+                {templates.length === 0 && (
+                  <div className="text-center py-16">
+                    <div className="p-6 rounded-2xl bg-gradient-to-br from-gray-500/20 to-gray-400/20 inline-block mb-6">
+                      <Layers className="h-16 w-16 text-gray-400" />
+                    </div>
+                    <h3 className="text-2xl font-bold text-white mb-4">No Templates Available</h3>
+                    <p className="text-gray-300 mb-8 max-w-md mx-auto">
+                      Templates are currently being loaded. Please wait a moment or refresh the page.
+                    </p>
+                    <button
+                      onClick={() => setStep(1)}
+                      className="glass-button bg-gradient-to-r from-purple-500/20 to-pink-500/20 hover:from-purple-400/30 hover:to-pink-400/30"
+                    >
+                      Continue with Custom Interview
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Step 1: Resume Upload */}
           {step === 1 && (
             <div className="glass-card space-y-8 animate-fade-in-up animation-delay-400">
               <div className="flex items-center space-x-4 mb-6">
@@ -244,9 +452,14 @@ const Interview = () => {
                     onChange={handleTextareaChange('resume_text')}
                   />
                 </div>
-              </div>
-
-              <div className="flex justify-end">
+              </div>              <div className="flex justify-between">
+                <button
+                  onClick={() => setStep(0)}
+                  className="group relative overflow-hidden bg-gradient-to-r from-gray-600 to-gray-500 hover:from-gray-500 hover:to-gray-400 text-white px-8 py-4 rounded-2xl font-semibold transition-all duration-300 transform hover:scale-105 flex items-center space-x-2"
+                >
+                  <ChevronRight className="h-5 w-5 rotate-180 group-hover:-translate-x-1 transition-transform duration-300" />
+                  <span>Back: Choose Template</span>
+                </button>
                 <button
                   onClick={() => setStep(2)}
                   disabled={!formData.resume_text.trim()}
@@ -265,18 +478,28 @@ const Interview = () => {
                   <Briefcase className="h-6 w-6 text-purple-400" />
                 </div>
                 <h2 className="text-2xl font-bold text-white">Step 2: Job Description</h2>
-              </div>
-              
-              <div className="space-y-3">
+              </div>              <div className="space-y-3">
                 <label className="block text-lg font-semibold text-white">
-                  Paste the job description or job requirements
+                  {selectedTemplate ? (
+                    <>
+                      Job Description{' '}
+                      <span className="text-purple-300 text-sm font-normal">(Optional - Template provides role context)</span>
+                    </>
+                  ) : (
+                    'Paste the job description or job requirements'
+                  )}
                 </label>
-                <textarea                  className="w-full h-48 px-6 py-4 bg-gradient-to-br from-slate-900/90 via-gray-900/80 to-slate-800/90 border border-purple-500/20 rounded-2xl text-white placeholder-purple-200/60 focus:outline-none focus:ring-2 focus:ring-purple-400/60 focus:border-purple-400/60 transition-all duration-300 resize-none hover:border-purple-500/40 hover:shadow-lg hover:shadow-purple-500/10 backdrop-blur-md"
-                  placeholder="Paste the job description here..."
+                <textarea
+                  className="w-full h-48 px-6 py-4 bg-gradient-to-br from-slate-900/90 via-gray-900/80 to-slate-800/90 border border-purple-500/20 rounded-2xl text-white placeholder-purple-200/60 focus:outline-none focus:ring-2 focus:ring-purple-400/60 focus:border-purple-400/60 transition-all duration-300 resize-none hover:border-purple-500/40 hover:shadow-lg hover:shadow-purple-500/10 backdrop-blur-md"
+                  placeholder={selectedTemplate 
+                    ? "Optionally paste specific job requirements to further customize the interview..." 
+                    : "Paste the job description here..."
+                  }
                   value={formData.job_description}
                   onChange={handleTextareaChange('job_description')}
                 />
               </div>
+      
 
               <div className="flex justify-between">
                 <button
@@ -285,20 +508,17 @@ const Interview = () => {
                 >
                   <ChevronRight className="h-5 w-5 rotate-180 group-hover:-translate-x-1 transition-transform duration-300" />
                   <span>Back: Resume</span>
-                </button>
-                <button
+                </button>                <button
                   onClick={() => setStep(3)}
-                  disabled={!formData.job_description.trim()}
+                  disabled={!selectedTemplate && !formData.job_description.trim()}
                   className="group relative overflow-hidden bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-400 hover:to-pink-500 text-white px-8 py-4 rounded-2xl font-semibold transition-all duration-300 transform hover:scale-105 hover:shadow-xl hover:shadow-purple-500/25 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center space-x-2"
                 >
                   <span>Next: Choose Interviewer</span>
                   <ChevronRight className="h-5 w-5 group-hover:translate-x-1 transition-transform duration-300" />
                 </button>
               </div>            </div>
-          )}
-
-          {/* Step 3: Choose Interviewer & Difficulty */}
-          {step === 3 && (
+          )}          {/* Step 3: Choose Interviewer & Difficulty OR Show Template Settings */}
+          {step === 3 && !selectedTemplate && (
             <div className="glass-card space-y-10 animate-fade-in-up animation-delay-400">
               <div className="flex items-center space-x-4 mb-8">
                 <div className="p-3 rounded-2xl bg-gradient-to-br from-green-500/20 to-emerald-500/20">
@@ -441,11 +661,131 @@ const Interview = () => {
                   )}
                 </button>
               </div>
+            </div>          )}
+
+          {/* Step 3: Template Settings Summary (when template is selected) */}
+          {step === 3 && selectedTemplate && (
+            <div className="glass-card space-y-8 animate-fade-in-up animation-delay-400">
+              <div className="flex items-center space-x-4 mb-8">
+                <div className="p-3 rounded-2xl bg-gradient-to-br from-purple-500/20 to-pink-500/20">
+                  <Layers className="h-6 w-6 text-purple-400" />
+                </div>
+                <h2 className="text-2xl font-bold text-white">Step 3: Interview Configuration</h2>
+              </div>              <div className="bg-purple-500/10 border border-purple-400/30 rounded-2xl p-6">
+                <h3 className="text-xl font-semibold text-white mb-4 flex items-center space-x-2">
+                  <Target className="h-5 w-5 text-purple-400" />
+                  <span>Using {selectedTemplate.name} Template</span>
+                </h3>
+                
+                <div className="bg-green-500/10 border border-green-400/30 rounded-xl p-4 mb-6">
+                  <div className="flex items-center space-x-2 text-green-300">
+                    <Sparkles className="h-4 w-4" />
+                    <span className="text-sm font-medium">Interview settings have been automatically configured from your template selection</span>
+                  </div>
+                </div>
+                
+                <div className="grid md:grid-cols-2 gap-6">
+                  {/* Interview Settings */}
+                  <div className="space-y-4">
+                    <h4 className="font-semibold text-purple-300 flex items-center space-x-2">
+                      <Settings className="h-4 w-4" />
+                      <span>Interview Settings</span>
+                    </h4>
+                    <div className="space-y-3 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-gray-400">Duration:</span>
+                        <span className="text-white font-medium">{selectedTemplate.duration_minutes || 60} minutes</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-400">Experience Level:</span>
+                        <span className="text-white font-medium capitalize">{selectedTemplate.experience_level || 'Mid'}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-400">Total Questions:</span>
+                        <span className="text-white font-medium">
+                          {Object.values(selectedTemplate.question_distribution || {}).reduce((a, b) => a + b, 0) || 5}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-400">Interviewers:</span>
+                        <span className="text-white font-medium">
+                          {selectedTemplate.interviewer_types?.map(type => type.replace('_', ' ')).join(', ') || 'Mixed'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Question Breakdown */}
+                  <div className="space-y-4">
+                    <h4 className="font-semibold text-purple-300 flex items-center space-x-2">
+                      <BarChart className="h-4 w-4" />
+                      <span>Question Breakdown</span>
+                    </h4>
+                    <div className="space-y-2">
+                      {Object.entries(selectedTemplate.question_distribution || {}).map(([category, count]) => (
+                        <div key={category} className="flex justify-between text-sm">
+                          <span className="text-gray-400 capitalize">{category.replace('_', ' ')}:</span>
+                          <span className="text-white font-medium">{count} questions</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Key Skills */}
+                {selectedTemplate.key_skills && selectedTemplate.key_skills.length > 0 && (
+                  <div className="mt-6 pt-6 border-t border-purple-400/20">
+                    <h4 className="font-semibold text-purple-300 mb-3 flex items-center space-x-2">
+                      <Brain className="h-4 w-4" />
+                      <span>Key Skills to be Assessed</span>
+                    </h4>
+                    <div className="flex flex-wrap gap-2">
+                      {selectedTemplate.key_skills.slice(0, 10).map((skill, index) => (
+                        <span key={index} className="px-3 py-1 bg-purple-500/20 text-purple-300 rounded-full text-sm">
+                          {skill}
+                        </span>
+                      ))}
+                      {selectedTemplate.key_skills.length > 10 && (
+                        <span className="px-3 py-1 bg-gray-500/20 text-gray-400 rounded-full text-sm">
+                          +{selectedTemplate.key_skills.length - 10} more
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex justify-between pt-6">
+                <button
+                  onClick={() => setStep(2)}
+                  className="group relative overflow-hidden bg-gradient-to-r from-gray-600 to-gray-500 hover:from-gray-500 hover:to-gray-400 text-white px-8 py-4 rounded-2xl font-semibold transition-all duration-300 transform hover:scale-105 flex items-center space-x-2"
+                >
+                  <ChevronRight className="h-5 w-5 rotate-180 group-hover:-translate-x-1 transition-transform duration-300" />
+                  <span>Back: Job Description</span>
+                </button>
+                <button
+                  onClick={startInterview}
+                  disabled={loading}
+                  className="group relative overflow-hidden bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-400 hover:to-pink-500 text-white px-12 py-4 rounded-2xl font-bold text-lg transition-all duration-300 transform hover:scale-105 hover:shadow-xl hover:shadow-purple-500/25 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center space-x-3"
+                >
+                  {loading ? (
+                    <>
+                      <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></div>
+                      <span>Starting Interview...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="h-6 w-6 group-hover:animate-spin transition-transform duration-300" />
+                      <span>Start Template Interview</span>
+                    </>
+                  )}
+                </button>              </div>
             </div>
           )}
         </div>
       </div>
-    </div>  );
+    </div>
+  );
 };
 
 export default Interview;
