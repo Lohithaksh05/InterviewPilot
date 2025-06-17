@@ -14,6 +14,49 @@ import logging
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
+def _get_interviewer_type_for_question_index(question_index: int, question_interviewer_types: list) -> str:
+    """
+    Get the interviewer type that should handle a specific question.
+    
+    Args:
+        question_index: 0-based index of the current question
+        question_interviewer_types: List of interviewer types for each question
+        
+    Returns:
+        The interviewer type that should handle this question
+    """
+    if not question_interviewer_types or question_index >= len(question_interviewer_types):
+        return 'hr'  # Default fallback
+    
+    return question_interviewer_types[question_index]
+
+def _get_interviewer_type_for_question_index_from_distribution(question_index: int, question_distribution: dict) -> str:
+    """
+    Determine which interviewer type should handle a specific question based on 
+    the template's question distribution (legacy support).
+    
+    Args:
+        question_index: 0-based index of the current question
+        question_distribution: Dict mapping interviewer types to question counts
+        
+    Returns:
+        The interviewer type that should handle this question
+    """
+    if not question_distribution:
+        return 'hr'  # Default fallback
+    
+    # Create ordered list of interviewer types based on distribution
+    ordered_types = []
+    for interviewer_type, count in question_distribution.items():
+        ordered_types.extend([interviewer_type] * count)
+    
+    # Return the interviewer type for this specific question index
+    if question_index < len(ordered_types):
+        return ordered_types[question_index]
+    else:
+        # Fallback if index is out of range
+        return list(question_distribution.keys())[0] if question_distribution else 'hr'
+
 # Initialize services
 try:
     gemini_service = GeminiService()
@@ -73,58 +116,74 @@ async def start_interview(request: dict, current_user: User = Depends(get_curren
                 status_code=400,
                 detail=f"Invalid difficulty level. Must be one of: {[d.value for d in DifficultyLevel]}"
             )
-        
-        # Generate session ID
+          # Generate session ID
         session_id = str(uuid.uuid4())
           # Generate questions - use template if available
         if selected_template:
-            logger.info(f"Using template: {selected_template.get('name', 'Unknown')} for question generation")
+            logger.info(f"Using template: {selected_template.get('name', 'Unknown')} for multi-agent question generation")
             
-            # Use template settings instead of user-provided settings
-            template_total_questions = sum(selected_template.get('question_distribution', {}).values()) or num_questions
-            template_primary_interviewer = selected_template.get('interviewer_types', [interviewer_type])[0]
+            # Get question distribution from template
+            question_distribution = selected_template.get('question_distribution', {})
+            template_interviewer_types = selected_template.get('interviewer_types', ['hr', 'tech_lead', 'behavioral'])
+            template_total_questions = sum(question_distribution.values()) or num_questions
             
             # Use template's question count (capped at reasonable limit)
             actual_num_questions = min(template_total_questions, 15)  # Cap at 15 questions
             
-            questions = await gemini_service.generate_questions_with_template(
-                resume_text, job_description, selected_template, actual_num_questions
+            # Generate questions using template distribution
+            questions = await gemini_service.generate_multi_agent_questions_with_distribution(
+                resume_text, job_description, selected_template, question_distribution, actual_num_questions
             )
             
-            # Use template's primary interviewer type for session
-            try:
-                template_interviewer_enum = InterviewerType(template_primary_interviewer)
-                session_interviewer_type = template_interviewer_enum
-            except ValueError:
-                session_interviewer_type = interviewer_enum  # Fallback to user selection
+            # Create interviewer type mapping for each question based on the template distribution
+            question_interviewer_types = []
+            for interviewer_type, count in question_distribution.items():
+                question_interviewer_types.extend([interviewer_type] * count)
+            
+            # Ensure we have the right number of mappings
+            question_interviewer_types = question_interviewer_types[:len(questions)]
+            
+            # For template-based interviews, use the job role as the interviewer type identifier
+            template_job_role = selected_template.get('job_role', 'Template Interview')
+            session_interviewer_type = template_job_role  # Store job role as interviewer type for templates
                 
         else:
             logger.info("Using standard question generation (no template)")
             # Create interviewer agent and generate questions
             interviewer = InterviewerFactory.create_interviewer(interviewer_enum, gemini_service)
             questions = await interviewer.generate_questions(resume_text, job_description, difficulty, num_questions)
-            session_interviewer_type = interviewer_enum        # Prepare session data
+            session_interviewer_type = interviewer_enum
+            question_interviewer_types = None  # Not applicable for single-agent interviews
+            template_interviewer_types = None        # Prepare session data
         session_data = {
             "interviewer_type": session_interviewer_type,
             "difficulty": difficulty_enum,
             "job_description": job_description,
             "resume_text": resume_text,
             "questions": questions,
-            "duration_minutes": request.get('duration_minutes') or (selected_template.get('duration_minutes') if selected_template else None),
+            "duration_minutes": request.get('duration_minutes') or (60 if selected_template else 30),
             "time_limit_enabled": True,  # Enable timer by default
-            "template_used": selected_template.get('name') if selected_template else None,
+            # Template-related data
+            "is_template_based": bool(selected_template),
+            "template_id": selected_template.get('id') if selected_template else None,
+            "template_name": selected_template.get('name') if selected_template else None,
+            "template_job_role": selected_template.get('job_role') if selected_template else None,
+            "template_question_distribution": selected_template.get('question_distribution', {}) if selected_template else None,
+            "template_interviewer_types": template_interviewer_types,
+            "question_interviewer_types": question_interviewer_types,
             "template_settings": {
                 "duration_minutes": selected_template.get('duration_minutes'),
                 "key_skills": selected_template.get('key_skills', []),
                 "evaluation_criteria": selected_template.get('evaluation_criteria', [])
             } if selected_template else None
-        }
-        
-        # Store session in database
+        }# Store session in database
         session = await interview_service.create_session(current_user, session_data)
         
+        # Use the session_id from the created session object
+        actual_session_id = session.session_id
+        
         return {
-            "session_id": session.session_id,
+            "session_id": actual_session_id,
             "interviewer_type": interviewer_type,
             "difficulty": difficulty,
             "questions": questions,
@@ -183,7 +242,7 @@ async def get_session(session_id: str, current_user: User = Depends(get_current_
         raise HTTPException(
             status_code=500,
             detail="Interview service not available."
-        )
+    )
     
     session = await interview_service.get_session(session_id, str(current_user.id))
     
@@ -195,7 +254,7 @@ async def get_session(session_id: str, current_user: User = Depends(get_current_
     
     return {
         "session_id": session_id,
-        "interviewer_type": session.interviewer_type.value,
+        "interviewer_type": session.interviewer_type.value if hasattr(session.interviewer_type, 'value') else str(session.interviewer_type),
         "difficulty": session.difficulty.value,
         "questions": session.questions,
         "answers": session.answers,
@@ -224,8 +283,7 @@ async def submit_answer(request: dict, current_user: User = Depends(get_current_
                 status_code=400,
                 detail="session_id and answer are required"
             )
-        
-        # Get session from database
+          # Get session from database
         session = await interview_service.get_session(session_id, str(current_user.id))
         
         if not session:
@@ -242,10 +300,53 @@ async def submit_answer(request: dict, current_user: User = Depends(get_current_
                 detail="All questions have been answered"
             )
         
-        current_question = session.questions[current_question_index]
+        current_question = session.questions[current_question_index]        # Handle template-based interviews vs regular interviews
+        if getattr(session, 'is_template_based', False):
+            # For template-based interviews, determine the appropriate interviewer type for this question
+            # First try to use the stored question_interviewer_types mapping
+            question_interviewer_types = getattr(session, 'question_interviewer_types', None)
+            
+            if question_interviewer_types:
+                # Use the direct mapping stored in the session
+                selected_interviewer_type_str = _get_interviewer_type_for_question_index(
+                    current_question_index, question_interviewer_types
+                )
+            else:
+                # Fallback: calculate from template question distribution
+                template_question_distribution = getattr(session, 'template_question_distribution', {})
+                
+                if template_question_distribution:
+                    selected_interviewer_type_str = _get_interviewer_type_for_question_index_from_distribution(
+                        current_question_index, template_question_distribution
+                    )
+                else:
+                    # Final fallback: round-robin through template interviewer types
+                    template_interviewer_types = getattr(session, 'template_interviewer_types', ['hr', 'tech_lead', 'behavioral'])
+                    total_types = len(template_interviewer_types)
+                    interviewer_type_index = current_question_index % total_types
+                    selected_interviewer_type_str = template_interviewer_types[interviewer_type_index]
+            
+            logger.info(f"Using {selected_interviewer_type_str} interviewer for question {current_question_index} in template-based interview")
+            
+            try:
+                evaluation_interviewer_type = InterviewerType(selected_interviewer_type_str)
+            except ValueError:
+                # Default to HR if the type is not recognized
+                evaluation_interviewer_type = InterviewerType.HR
+        else:
+            # For regular interviews, use the session's interviewer type
+            if hasattr(session.interviewer_type, 'value'):
+                evaluation_interviewer_type = session.interviewer_type
+            else:
+                # If it's a string, try to convert to enum
+                try:
+                    evaluation_interviewer_type = InterviewerType(session.interviewer_type)
+                except ValueError:
+                    # Default to HR if conversion fails
+                    evaluation_interviewer_type = InterviewerType.HR
         
         # Create interviewer agent and evaluate answer
-        interviewer = InterviewerFactory.create_interviewer(session.interviewer_type, gemini_service)
+        interviewer = InterviewerFactory.create_interviewer(evaluation_interviewer_type, gemini_service)
         evaluation = await interviewer.evaluate_answer(
             current_question, 
             answer, 
@@ -337,12 +438,20 @@ async def get_interview_summary(session_id: str, current_user: User = Depends(ge
                 status_code=400,
                 detail="No answers submitted yet"
             )
+          # Generate comprehensive summary
+        # Handle interviewer type for both enum and string types
+        interviewer_type_for_summary = session.interviewer_type
+        if hasattr(session.interviewer_type, 'value'):
+            interviewer_type_for_summary = session.interviewer_type.value
+        elif isinstance(session.interviewer_type, str):
+            interviewer_type_for_summary = session.interviewer_type
+        else:
+            interviewer_type_for_summary = 'hr'  # Default fallback
         
-        # Generate comprehensive summary
         summary = await gemini_service.generate_interview_summary(
             session.questions,
             session.answers,
-            session.interviewer_type.value
+            interviewer_type_for_summary
         )
         
         # Calculate overall score from individual feedback
@@ -368,17 +477,29 @@ async def get_interview_summary(session_id: str, current_user: User = Depends(ge
             timing_info["duration_formatted"] = f"{session.minutes_taken} minutes"
         else:
             timing_info["duration_formatted"] = "N/A"
+          # Handle difficulty for both enum and string types
+        difficulty_for_response = session.difficulty
+        if hasattr(session.difficulty, 'value'):
+            difficulty_for_response = session.difficulty.value
+        elif isinstance(session.difficulty, str):
+            difficulty_for_response = session.difficulty
+        else:
+            difficulty_for_response = 'medium'  # Default fallback
         
         return {
             "session_id": session_id,
-            "interviewer_type": session.interviewer_type.value,
-            "difficulty": session.difficulty.value,
+            "interviewer_type": interviewer_type_for_summary,
+            "difficulty": difficulty_for_response,
             "total_questions": len(session.questions),
             "answered_questions": len(session.answers),
             "average_score": round(average_score, 2),
             "individual_feedback": session.feedback,
             "overall_summary": summary,
             "timing": timing_info,
+            # Add template info for template-based interviews
+            "is_template_based": getattr(session, 'is_template_based', False),
+            "template_name": getattr(session, 'template_name', None),
+            "template_job_role": getattr(session, 'template_job_role', None),
             "qa_pairs": [
                 {
                     "question": q,
@@ -413,15 +534,31 @@ async def list_sessions(current_user: User = Depends(get_current_user)):
         
         sessions_list = []
         for session in sessions:
-            sessions_list.append({
-                "session_id": session.session_id,
-                "interviewer_type": session.interviewer_type.value,
-                "difficulty": session.difficulty.value,
-                "created_at": session.created_at,
-                "total_questions": len(session.questions),
-                "answered_questions": len(session.answers),
-                "completed": session.completed if hasattr(session, 'completed') else len(session.answers) >= len(session.questions)
-            })
+            try:
+                # Handle both enum and string interviewer types
+                interviewer_type_value = session.interviewer_type.value if hasattr(session.interviewer_type, 'value') else str(session.interviewer_type)
+                
+                # Safely get session attributes with fallbacks
+                session_data = {
+                    "session_id": getattr(session, 'session_id', str(session.id) if session.id else 'unknown'),
+                    "interviewer_type": interviewer_type_value,
+                    "difficulty": session.difficulty.value if hasattr(session.difficulty, 'value') else str(session.difficulty),
+                    "created_at": getattr(session, 'created_at', datetime.now()),
+                    "total_questions": len(getattr(session, 'questions', [])),
+                    "answered_questions": len(getattr(session, 'answers', [])),
+                    "completed": getattr(session, 'completed', False) if hasattr(session, 'completed') else len(getattr(session, 'answers', [])) >= len(getattr(session, 'questions', [])),
+                    # Template information
+                    "is_template_based": getattr(session, 'is_template_based', False),
+                    "template_id": getattr(session, 'template_id', None),
+                    "template_name": getattr(session, 'template_name', None),
+                    "template_job_role": getattr(session, 'template_job_role', None),
+                    "duration_minutes": getattr(session, 'duration_minutes', 30)
+                }
+                
+                sessions_list.append(session_data)
+            except Exception as session_error:
+                logger.warning(f"Error processing session {getattr(session, 'session_id', 'unknown')}: {str(session_error)}")
+                continue
         
         return {
             "sessions": sorted(sessions_list, key=lambda x: x['created_at'], reverse=True),
@@ -430,6 +567,8 @@ async def list_sessions(current_user: User = Depends(get_current_user)):
         
     except Exception as e:
         logger.error(f"Error listing sessions: {str(e)}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
         raise HTTPException(
             status_code=500,
             detail=f"Error listing sessions: {str(e)}"
@@ -609,42 +748,26 @@ async def get_session_recordings(session_id: str, current_user: User = Depends(g
         )
 
 @router.get("/recording/{recording_id}")
-async def get_recording(recording_id: str, current_user: User = Depends(get_current_user)):
-    """Get a specific recording with audio data"""
-    if not interview_service:
-        raise HTTPException(
-            status_code=500,
-            detail="Interview service not available."
-        )
-    
+async def get_user_recording(recording_id: str, current_user: User = Depends(get_current_user)):
+    """Fetch a single interview recording (including audio_data) by recording_id for the current user"""
     try:
-        logger.info(f"Fetching recording with ID: {recording_id}")
-        
         recording = await interview_service.get_recording(recording_id)
-        
         if not recording:
-            logger.warning(f"Recording not found for ID: {recording_id}")
             raise HTTPException(status_code=404, detail="Recording not found")
-        
-        logger.info(f"Found recording for ID: {recording_id}, session: {recording.get('session_id')}")
-        
-        # Verify the recording belongs to the current user
-        # We need to check if the session belongs to the user
-        session = await interview_service.get_session(recording.get('session_id'), str(current_user.id))
-        if not session:
-            logger.warning(f"Access denied for recording {recording_id} - session not found or not owned by user")
+        # Security: Only allow access to user's own recordings
+        if str(recording.get("user_id")) != str(current_user.id):
             raise HTTPException(status_code=403, detail="Access denied")
-        
-        return {
-            "success": True,
-            "recording": recording
-        }
-        
-    except HTTPException:
-        raise
+        return {"recording": recording}
     except Exception as e:
-        logger.error(f"Error getting recording {recording_id}: {str(e)}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Error getting recording: {str(e)}"
-        )
+        logger.error(f"Error fetching user recording: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to fetch user recording")
+
+@router.get("/recordings")
+async def list_user_recordings(current_user: User = Depends(get_current_user)):
+    """List all interview recordings for the current user (excluding audio_data)"""
+    try:
+        recordings = await interview_service.get_user_recordings(current_user.id)
+        return {"recordings": recordings}
+    except Exception as e:
+        logger.error(f"Error listing user recordings: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to list user recordings")

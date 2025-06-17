@@ -16,10 +16,9 @@ class InterviewService:
     async def create_session(self, user: User, session_data: dict) -> InterviewSession:
         """Create a new interview session"""
         session_id = str(uuid.uuid4())
-        
         session = InterviewSession(
-            id=session_id,  # Set the MongoDB _id to the same value as session_id
-            session_id=session_id,
+            id=session_id,  # MongoDB _id
+            session_id=session_id,  # Explicit session_id field
             user_id=str(user.id),
             interviewer_type=session_data["interviewer_type"],
             difficulty=session_data["difficulty"],
@@ -28,68 +27,70 @@ class InterviewService:
             questions=session_data.get("questions", []),
             duration_minutes=session_data.get("duration_minutes", 30),
             time_limit_enabled=session_data.get("time_limit_enabled", True),
-            # Don't set started_at here - it will be set when user actually starts
+            is_template_based=session_data.get("is_template_based", False),
+            template_id=session_data.get("template_id"),
+            template_name=session_data.get("template_name"),
+            template_job_role=session_data.get("template_job_role"),
+            template_question_distribution=session_data.get("template_question_distribution"),
+            template_interviewer_types=session_data.get("template_interviewer_types"),
+            question_interviewer_types=session_data.get("question_interviewer_types"),
             created_at=get_ist_now(),
             updated_at=get_ist_now()
         )
         
         try:
             if is_connected():
-                # Use MongoDB
                 db = get_database()
                 sessions_collection = db.interview_sessions
                 session_dict = session.dict(by_alias=True)
+                session_dict["_id"] = session_id
+                session_dict["session_id"] = session_id
                 result = await sessions_collection.insert_one(session_dict)
-                
-                # Verify the session was actually saved
-                saved_session = await sessions_collection.find_one({"session_id": session_id})
-                if saved_session:
-                    logger.info(f"Session {session_id} successfully saved to MongoDB")
-                else:
-                    logger.error(f"Session {session_id} failed to save to MongoDB - falling back to memory")
-                    raise Exception("MongoDB save verification failed")
+                logger.info(f"Session {session_id} successfully saved to MongoDB")
+                # Return the session object with confirmed session_id
+                session.session_id = session_id
+                return session
             else:
                 logger.warning("MongoDB not connected - using memory database")
-                # Use in-memory database
                 session_dict = session.dict()
                 memory_db.create_session(session_dict)
-                logger.info(f"Created session {session_id} in memory database")
+                return session
         except Exception as e:
             logger.error(f"Error creating session in MongoDB: {str(e)}")
-            # Fallback to memory database
             session_dict = session.dict()
             memory_db.create_session(session_dict)
-            logger.info(f"Created session {session_id} in memory database (fallback)")
-        
-        return session
+            return session
 
-    async def get_session(self, session_id: str, user_id: str) -> Optional[InterviewSession]:
-        """Get interview session by ID for specific user"""
+    async def get_session(self, session_id: str, user_id: str = None) -> Optional[InterviewSession]:
+        """Get interview session by ID"""
+        logger.info(f"Fetching session: session_id={session_id}")
         try:
             if is_connected():
-                # Use MongoDB
                 db = get_database()
                 sessions_collection = db.interview_sessions
-                
+                # Query by session_id only
                 session_data = await sessions_collection.find_one({
-                    "session_id": session_id,
-                    "user_id": user_id
+                    "session_id": session_id
                 })
-                
+                if not session_data:
+                    # Fallback: try by _id
+                    session_data = await sessions_collection.find_one({
+                        "_id": session_id
+                    })
                 if session_data:
+                    logger.info(f"Session found: {session_data.get('session_id', 'unknown')}")
                     return InterviewSession(**session_data)
+                else:
+                    logger.warning(f"No session found for session_id={session_id}")
             else:
-                # Use in-memory database
                 session_data = memory_db.find_session(session_id, user_id)
                 if session_data:
                     return InterviewSession(**session_data)
         except Exception as e:
             logger.error(f"Error getting session: {str(e)}")
-            # Fallback to memory database
             session_data = memory_db.find_session(session_id, user_id)
             if session_data:
                 return InterviewSession(**session_data)
-        
         return None
 
     async def add_answer(self, session_id: str, user_id: str, answer: str, feedback: dict) -> bool:
@@ -265,14 +266,36 @@ class InterviewService:
                 cursor = sessions_collection.find({"user_id": user_id})
                 sessions = []
                 async for session_data in cursor:
-                    sessions.append(InterviewSession(**session_data))
+                    try:
+                        # Handle both old and new session formats
+                        if 'session_id' not in session_data and '_id' in session_data:
+                            session_data['session_id'] = str(session_data['_id'])
+                          # Ensure required fields exist with defaults
+                        session_data.setdefault('is_template_based', False)
+                        session_data.setdefault('template_id', None)
+                        session_data.setdefault('template_name', None)
+                        session_data.setdefault('template_job_role', None)
+                        session_data.setdefault('template_question_distribution', None)
+                        session_data.setdefault('template_interviewer_types', None)
+                        session_data.setdefault('question_interviewer_types', None)
+                        session_data.setdefault('started_at', None)
+                        session_data.setdefault('ended_at', None)
+                        session_data.setdefault('duration_minutes', 30)
+                        session_data.setdefault('time_limit_enabled', True)
+                        
+                        sessions.append(InterviewSession(**session_data))
+                    except Exception as e:
+                        logger.warning(f"Skipping invalid session data: {str(e)}")
+                        continue
+                        
                 return sessions
             else:
                 # Use in-memory database
                 sessions_data = memory_db.find_sessions_by_user(user_id)
                 return [InterviewSession(**session) for session in sessions_data]
         except Exception as e:
-            logger.error(f"Error getting user sessions: {str(e)}")            # Fallback to memory database
+            logger.error(f"Error getting user sessions: {str(e)}")
+            # Fallback to memory database
             sessions_data = memory_db.find_sessions_by_user(user_id)
             return [InterviewSession(**session) for session in sessions_data]
 
@@ -508,3 +531,32 @@ class InterviewService:
         except Exception as e:
             logger.error(f"Error counting session recordings: {str(e)}")
             return 0
+
+    async def get_user_recordings(self, user_id: str) -> list:
+        """Get all interview recordings for a user across all sessions"""
+        try:
+            if is_connected():
+                db = get_database()
+                recordings_collection = db.interview_recordings
+                cursor = recordings_collection.find({"user_id": user_id})
+                recordings = []
+                async for recording in cursor:
+                    recording_id = recording.get('_id', str(recording.get('_id')))
+                    recording["recording_id"] = recording_id
+                    recording.pop("audio_data", None)
+                    recordings.append(recording)
+                return recordings
+            else:
+                if not hasattr(memory_db, 'recordings'):
+                    return []
+                recordings = []
+                for recording_id, recording in memory_db.recordings.items():
+                    if recording.get('user_id') == user_id:
+                        rec_copy = recording.copy()
+                        rec_copy.pop("audio_data", None)
+                        rec_copy['_id'] = recording_id
+                        recordings.append(rec_copy)
+                return recordings
+        except Exception as e:
+            logger.error(f"Error getting user recordings: {str(e)}")
+            raise

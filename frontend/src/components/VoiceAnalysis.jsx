@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { voiceAPI } from '../services/api';
 import { 
   Mic, Volume2, Clock, Zap, TrendingUp, TrendingDown,
@@ -6,20 +6,12 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
-const VoiceAnalysis = ({ audioData, transcript, duration, sessionId, questionIndex }) => {
-  const [analysis, setAnalysis] = useState(null);
+const VoiceAnalysis = ({ audioData, transcript, duration, sessionId, questionIndex, existingAnalysis }) => {
+  const [analysis, setAnalysis] = useState(existingAnalysis || null);
   const [quickAnalysis, setQuickAnalysis] = useState(null);
   const [loading, setLoading] = useState(false);
   const [showCoachingTips, setShowCoachingTips] = useState(false);
-  const [coachingTips, setCoachingTips] = useState({});
-
-  useEffect(() => {
-    if (transcript && duration > 0) {
-      performQuickAnalysis();
-    }
-  }, [transcript, duration]);
-
-  const performQuickAnalysis = async () => {
+  const [coachingTips, setCoachingTips] = useState({});const performQuickAnalysis = useCallback(async () => {
     try {
       const response = await voiceAPI.quickAnalyze({
         transcript,
@@ -29,30 +21,80 @@ const VoiceAnalysis = ({ audioData, transcript, duration, sessionId, questionInd
     } catch (error) {
       console.error('Quick analysis error:', error);
     }
-  };
+  }, [transcript, duration]);  useEffect(() => {
+    console.log('VoiceAnalysis received props:', { transcript, duration, audioData: !!audioData, existingAnalysis: !!existingAnalysis });
+    
+    // If we have existing analysis, don't perform quick analysis
+    if (existingAnalysis) {
+      console.log('Using existing analysis');
+      return;
+    }
+    
+    if (transcript && duration > 0) {
+      console.log('Performing quick analysis...');
+      performQuickAnalysis();
+    }
+  }, [transcript, duration, audioData, performQuickAnalysis, existingAnalysis]);
 
-  const performFullAnalysis = async () => {
-    if (!audioData) {
-      toast.error('No audio data available for analysis');
+  // Update analysis when existingAnalysis changes
+  useEffect(() => {
+    if (existingAnalysis) {
+      setAnalysis(existingAnalysis);
+    }
+  }, [existingAnalysis]);  const performFullAnalysis = async () => {
+    if (!audioData && (!transcript || duration <= 0)) {
+      toast.error('No audio or transcript data available for detailed analysis');
       return;
     }
 
     try {
       setLoading(true);
-      const response = await voiceAPI.analyzeVoice({
-        recording_id: `${sessionId}_${questionIndex}`,
-        session_id: sessionId,
-        question_index: questionIndex,
-        audio_data: audioData,
-        transcript,
-        duration
-      });
-      
-      setAnalysis(response.analysis);
-      toast.success('Voice analysis completed!');
+      if (audioData) {
+        // Only call backend if audioData is present
+        const response = await voiceAPI.analyzeVoice({
+          recording_id: `${sessionId}_${questionIndex}`,
+          session_id: sessionId,
+          question_index: questionIndex,
+          audio_data: audioData,
+          transcript,
+          duration
+        });
+        setAnalysis(response.analysis);
+      } else {
+        // Simulate analysis on frontend for practice mode
+        const simulatedAnalysis = {
+          overall_score: quickAnalysis?.confidence_score || 75,
+          voice_metrics: {
+            speaking_rate: quickAnalysis?.speaking_rate || 150,
+            clarity_score: quickAnalysis?.confidence_score || 75,
+            confidence_score: quickAnalysis?.confidence_score || 75,
+            pause_frequency: Math.max(0, (quickAnalysis?.filler_count / Math.max(duration / 60, 1)) || 2),
+            volume_consistency: 80,
+            energy_level: 70
+          },
+          filler_words: quickAnalysis?.filler_words || [],
+          strengths: [
+            'Clear articulation',
+            'Good speaking pace',
+            'Confident delivery'
+          ].filter(() => Math.random() > 0.3),
+          improvement_areas: [
+            'Reduce filler words',
+            'Maintain consistent volume',
+            'Add more pauses for emphasis'
+          ].filter(() => Math.random() > 0.5),
+          specific_feedback: 'Based on your transcript analysis, you demonstrate good communication skills. Focus on reducing filler words and maintaining a steady pace for even better results.'
+        };
+        setAnalysis(simulatedAnalysis);
+        toast.success('Simulated analysis generated!');
+      }
     } catch (error) {
       console.error('Voice analysis error:', error);
-      toast.error('Failed to analyze voice recording');
+      if (error.message?.includes('required')) {
+        toast.error('Unable to perform detailed analysis without audio recording. Quick analysis is available based on your transcript.');
+      } else {
+        toast.error('Failed to analyze voice recording');
+      }
     } finally {
       setLoading(false);
     }
@@ -165,8 +207,13 @@ const VoiceAnalysis = ({ audioData, transcript, duration, sessionId, questionInd
           <div className="mt-4 pt-4 border-t border-gray-700">
             <button
               onClick={performFullAnalysis}
-              disabled={loading || !audioData}
+              disabled={loading || (!audioData && (!transcript || duration <= 0))}
               className="w-full bg-primary-500/20 hover:bg-primary-500/30 disabled:opacity-50 disabled:cursor-not-allowed text-primary-300 font-medium py-3 px-4 rounded-lg transition-colors duration-200 flex items-center justify-center space-x-2"
+              title={
+                !audioData && transcript && duration > 0
+                  ? 'No audio recording available. Detailed analysis will be simulated based on your transcript.'
+                  : ''
+              }
             >
               {loading ? (
                 <>
@@ -176,10 +223,17 @@ const VoiceAnalysis = ({ audioData, transcript, duration, sessionId, questionInd
               ) : (
                 <>
                   <Mic className="h-4 w-4" />
-                  <span>Get Detailed Voice Analysis</span>
+                  <span>
+                    {audioData ? 'Get Detailed Voice Analysis' : 'Simulate Detailed Analysis (Transcript Only)'}
+                  </span>
                 </>
               )}
             </button>
+            {!audioData && transcript && duration > 0 && (
+              <div className="text-xs text-yellow-400 mt-2 text-center">
+                No audio recording available. Detailed analysis will be simulated based on your transcript.
+              </div>
+            )}
           </div>
         </div>
       )}

@@ -13,23 +13,38 @@ const Interview = () => {
   const [difficultyLevels, setDifficultyLevels] = useState([]);
   const [templates, setTemplates] = useState([]);
   const [selectedTemplate, setSelectedTemplate] = useState(null);
-  
-  // Form data
+    // Form data
   const [formData, setFormData] = useState({
     resume_text: '',
     job_description: '',
     interviewer_type: '',
     difficulty: 'medium',
-    num_questions: 5
+    num_questions: 5,
+    duration_minutes: 30 // Default duration for non-template interviews
   });
 
   // File upload state
   const [uploadedFile, setUploadedFile] = useState(null);  useEffect(() => {
     // Check if a template was selected from the Templates page
     if (location.state?.selectedTemplate) {
-      setSelectedTemplate(location.state.selectedTemplate);
+      const template = location.state.selectedTemplate;
+      setSelectedTemplate(template);      // Auto-fill form data from template
+      const totalQuestions = Object.values(template.question_distribution || {}).reduce((a, b) => a + b, 0) || 5;
+      const primaryInterviewer = template.interviewer_types?.[0] || 'hr';
+      const primaryDifficulty = template.experience_level === 'senior' ? 'hard' : 
+                              template.experience_level === 'junior' ? 'easy' : 'medium';
+      const templateDuration = 60; // Always use 60 minutes for template-based interviews
+      
+      setFormData(prev => ({
+        ...prev,
+        interviewer_type: primaryInterviewer,
+        difficulty: primaryDifficulty,
+        num_questions: Math.min(totalQuestions, 10), // Cap at 10 questions
+        duration_minutes: templateDuration
+      }));
+      
       setStep(1); // Skip template selection step
-      toast.success(`Using ${location.state.selectedTemplate.name} template`);
+      toast.success(`Using ${template.name} template with ${primaryInterviewer.replace('_', ' ')} interviewer`);
     }
     
     fetchTemplates();
@@ -114,20 +129,23 @@ const Interview = () => {
     
     if (!formData.interviewer_type) {
       toast.error('Please select an interviewer type');
-      return;    }
-
-    setLoading(true);
+      return;    }    setLoading(true);
     try {
       // Include selected template in the request
       const interviewData = {
         ...formData,
         selected_template: selectedTemplate,
-        duration_minutes: calculateInterviewDuration({
-          numQuestions: formData.num_questions,
-          difficulty: formData.difficulty,
-          interviewerType: formData.interviewer_type,
-          selectedTemplate: selectedTemplate
-        })
+        is_template_based: !!selectedTemplate,
+        template_id: selectedTemplate?.id || null,
+        template_name: selectedTemplate?.name || null,
+        template_job_role: selectedTemplate?.job_role || null,        duration_minutes: selectedTemplate ? 
+          60 : // Always use 60 minutes for template-based interviews
+          calculateInterviewDuration({
+            numQuestions: formData.num_questions,
+            difficulty: formData.difficulty,
+            interviewerType: formData.interviewer_type,
+            selectedTemplate: selectedTemplate
+          })
       };
       
       const response = await interviewAPI.startInterview(interviewData);
@@ -289,18 +307,19 @@ const Interview = () => {
                     <div 
                       key={template.id}                  onClick={() => {
                     setSelectedTemplate(template);
-                    
-                    // Auto-fill form data from template
+                      // Auto-fill form data from template
                     const totalQuestions = Object.values(template.question_distribution || {}).reduce((a, b) => a + b, 0) || 5;
                     const primaryInterviewer = template.interviewer_types?.[0] || 'hr';
                     const primaryDifficulty = template.experience_level === 'senior' ? 'hard' : 
                                             template.experience_level === 'junior' ? 'easy' : 'medium';
+                    const templateDuration = template.duration_minutes || 60; // Default to 60 minutes for templates
                     
                     setFormData(prev => ({
                       ...prev,
                       interviewer_type: primaryInterviewer,
                       difficulty: primaryDifficulty,
-                      num_questions: Math.min(totalQuestions, 10) // Cap at 10 questions
+                      num_questions: Math.min(totalQuestions, 10), // Cap at 10 questions
+                      duration_minutes: templateDuration
                     }));
                     
                     // Skip to Step 1 (Resume Upload) since template provides the settings

@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field, ConfigDict
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Union
 from typing_extensions import Annotated
 from enum import Enum
 from datetime import datetime, timezone, timedelta
@@ -65,7 +65,7 @@ class InterviewSession(BaseModel):
     id: Optional[str] = Field(default=None, alias="_id")  # Use string ID instead of ObjectId
     session_id: str
     user_id: str  # Reference to the user who owns this session
-    interviewer_type: InterviewerType
+    interviewer_type: Union[InterviewerType, str]  # Allow both enum and string for template job roles
     difficulty: DifficultyLevel
     job_description: str
     resume_text: str
@@ -77,6 +77,19 @@ class InterviewSession(BaseModel):
     duration_minutes: Optional[int] = Field(default=None, description="Interview duration in minutes")
     time_limit_enabled: bool = Field(default=True, description="Whether time limit is enforced")
     minutes_taken: Optional[int] = Field(default=None, description="Actual minutes taken to complete interview")
+    
+    # Multi-agent question mapping for template-based interviews
+    question_interviewer_types: Optional[List[str]] = Field(default=None, description="Which interviewer type should handle each question")
+    
+    # Template-related fields
+    is_template_based: bool = Field(default=False, description="Whether this interview uses a template")
+    template_id: Optional[str] = Field(default=None, description="ID of the template used")
+    template_name: Optional[str] = Field(default=None, description="Name of the template used")
+    template_job_role: Optional[str] = Field(default=None, description="Job role from the template")
+    template_question_distribution: Optional[Dict[str, int]] = Field(default=None, description="Question distribution from template")
+    template_interviewer_types: Optional[List[str]] = Field(default=None, description="List of interviewer types from template")
+    started_at: Optional[datetime] = Field(default=None, description="When the interview actually started")
+    ended_at: Optional[datetime] = Field(default=None, description="When the interview ended")
     created_at: datetime = Field(default_factory=get_ist_now)
     updated_at: datetime = Field(default_factory=get_ist_now)
 

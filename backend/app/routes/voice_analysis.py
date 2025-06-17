@@ -110,6 +110,130 @@ async def quick_voice_analysis(
         logger.error(f"Error in quick voice analysis: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to perform quick voice analysis")
 
+@router.post("/practice-analyze")
+async def practice_voice_analysis(
+    request: Dict[str, Any],
+    current_user: User = Depends(get_current_user)
+):
+    """Detailed voice analysis for practice sessions (transcript-only)"""
+    try:
+        transcript = request.get("transcript", "")
+        duration = request.get("duration", 0.0)
+        
+        if not transcript or duration <= 0:
+            raise HTTPException(
+                status_code=400,
+                detail="transcript and duration are required"
+            )
+        
+        # Perform comprehensive transcript-based analysis
+        word_count = len(transcript.split())
+        speaking_rate = (word_count / duration) * 60 if duration > 0 else 0
+        
+        # Count filler words
+        filler_words_list = ["um", "uh", "er", "ah", "like", "you know", "so", "well", "actually", "basically"]
+        filler_analysis = []
+        total_filler_count = 0
+        
+        for filler in filler_words_list:
+            count = transcript.lower().count(filler)
+            if count > 0:
+                filler_analysis.append({"word": filler, "count": count})
+                total_filler_count += count
+        
+        filler_rate = (total_filler_count / duration) * 60 if duration > 0 else 0
+        
+        # Calculate scores
+        pace_score = min(100, max(0, 100 - abs(speaking_rate - 150) * 2))
+        filler_score = max(0, 100 - total_filler_count * 10)
+        
+        # Overall confidence score
+        confidence_score = (pace_score + filler_score) / 2
+        
+        # Generate feedback
+        strengths = []
+        improvement_areas = []
+        
+        if speaking_rate >= 130 and speaking_rate <= 170:
+            strengths.append("Excellent speaking pace - easy to follow")
+        elif speaking_rate < 130:
+            improvement_areas.append("Try speaking a bit faster to maintain engagement")
+        else:
+            improvement_areas.append("Try speaking more slowly for better clarity")
+        
+        if total_filler_count <= 2:
+            strengths.append("Great job avoiding filler words")
+        elif total_filler_count <= 5:
+            strengths.append("Good control of filler words")
+        else:
+            improvement_areas.append("Work on reducing filler words")
+        
+        if word_count >= 50:
+            strengths.append("Good content depth and elaboration")
+        else:
+            improvement_areas.append("Try to provide more detailed responses")
+        
+        # Create detailed analysis result
+        analysis_result = {
+            "overall_score": confidence_score,
+            "voice_metrics": {
+                "speaking_rate": speaking_rate,
+                "clarity_score": min(100, confidence_score + 10),  # Simulated
+                "confidence_score": confidence_score,
+                "pause_frequency": max(0, total_filler_count * 0.5),  # Estimated
+                "volume_consistency": 85,  # Simulated
+                "energy_level": min(100, confidence_score + 5)  # Simulated
+            },
+            "filler_words": filler_analysis,
+            "strengths": strengths,
+            "improvement_areas": improvement_areas,
+            "specific_feedback": f"Based on your {duration:.1f}-second response with {word_count} words, you're speaking at {speaking_rate:.0f} words per minute. {'Great job maintaining a natural pace!' if 130 <= speaking_rate <= 170 else 'Consider adjusting your speaking pace for better delivery.'}"
+        }
+        
+        return {"analysis": analysis_result}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error in practice voice analysis: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to perform practice voice analysis")
+
+@router.post("/practice-detailedanalyze")
+async def practice_detailed_voice_analysis(
+    request: Dict[str, Any],
+    current_user: User = Depends(get_current_user)
+):
+    """Detailed voice analysis for practice sessions with audio data"""
+    try:
+        transcript = request.get("transcript", "")
+        duration = request.get("duration", 0.0)
+        audio_data = request.get("audio_data")
+        
+        if not transcript or duration <= 0:
+            raise HTTPException(
+                status_code=400,
+                detail="transcript and duration are required"
+            )
+        
+        # Use the voice analysis service for comprehensive analysis
+        analysis_result = await voice_analysis_service.analyze_voice_recording(
+            recording_id=f"practice_{current_user.id}_{int(duration)}",
+            user_id=current_user.id,
+            session_id="practice_session",
+            question_index=0,
+            audio_data=audio_data,
+            transcript=transcript,
+            duration=float(duration)
+        )
+        
+        return {"analysis": analysis_result.dict()}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error in practice detailed voice analysis: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to perform practice detailed voice analysis")
+
 @router.get("/coaching-tips")
 async def get_voice_coaching_tips(
     category: str = None,

@@ -129,14 +129,16 @@ const Dashboard = () => {
 
   // Filtering and pagination logic
   const filterSessions = (sessions) => {
-    return sessions.filter(session => {
-      // Search filter
+    return sessions.filter(session => {      // Search filter
       if (searchTerm) {
         const searchLower = searchTerm.toLowerCase();
         const matchesSearch = 
           session.interviewer_type.toLowerCase().includes(searchLower) ||
           session.session_id.toLowerCase().includes(searchLower) ||
-          formatDate(session.created_at).toLowerCase().includes(searchLower);
+          formatDate(session.created_at).toLowerCase().includes(searchLower) ||
+          (session.is_template_based && 'template'.includes(searchLower)) ||
+          (session.template_job_role && session.template_job_role.toLowerCase().includes(searchLower)) ||
+          (session.template_name && session.template_name.toLowerCase().includes(searchLower));
         if (!matchesSearch) return false;
       }
 
@@ -144,10 +146,11 @@ const Dashboard = () => {
       if (statusFilter !== 'all') {
         if (statusFilter === 'completed' && !session.completed) return false;
         if (statusFilter === 'in_progress' && session.completed) return false;
+      }      // Type filter
+      if (typeFilter !== 'all') {
+        if (typeFilter === 'template' && !session.is_template_based) return false;
+        if (typeFilter !== 'template' && session.interviewer_type !== typeFilter) return false;
       }
-
-      // Type filter
-      if (typeFilter !== 'all' && session.interviewer_type !== typeFilter) return false;
 
       // Date filter
       if (dateFilter !== 'all') {
@@ -419,9 +422,9 @@ const Dashboard = () => {
                   value={typeFilter}
                   onChange={(e) => handleFilterChange('type', e.target.value)}
                   className="glass-input w-full px-3 py-2 bg-gray-800/50 border border-white/20 rounded-lg text-white focus:border-cyan-400/50 focus:ring-1 focus:ring-cyan-400/30 transition-all duration-200"
-                  style={{ colorScheme: 'dark' }}
-                >
+                  style={{ colorScheme: 'dark' }}                >
                   <option value="all" className="bg-gray-800 text-white">All Types</option>
+                  <option value="template" className="bg-gray-800 text-white">Template Interviews</option>
                   <option value="hr" className="bg-gray-800 text-white">HR Interview</option>
                   <option value="tech_lead" className="bg-gray-800 text-white">Technical Lead</option>
                   <option value="behavioral" className="bg-gray-800 text-white">Behavioral</option>
@@ -488,11 +491,11 @@ const Dashboard = () => {
           <>
             {/* Sessions Table */}
             <div className="overflow-x-auto rounded-2xl border border-white/10 mb-6">
-              <table className="w-full">
-                <thead>
+              <table className="w-full">                <thead>
                   <tr className="bg-gradient-to-r from-slate-800/50 to-gray-800/50 border-b border-white/10">
-                    <th className="text-left py-4 px-6 font-semibold text-cyan-300">Interviewer Type</th>
+                    <th className="text-left py-4 px-6 font-semibold text-cyan-300">Interview Type</th>
                     <th className="text-left py-4 px-6 font-semibold text-cyan-300">Date</th>
+                    <th className="text-left py-4 px-6 font-semibold text-cyan-300">Duration</th>
                     <th className="text-left py-4 px-6 font-semibold text-cyan-300">Questions</th>
                     <th className="text-left py-4 px-6 font-semibold text-cyan-300">Status</th>
                     <th className="text-left py-4 px-6 font-semibold text-cyan-300">Actions</th>
@@ -504,21 +507,30 @@ const Dashboard = () => {
                       key={session.session_id} 
                       className="hover:bg-white/5 transition-all duration-300 group animate-fadeInUp"
                       style={{ animationDelay: `${0.9 + index * 0.1}s` }}
-                    >
-                      <td className="py-4 px-6">
+                    >                      <td className="py-4 px-6">
                         <div className="flex items-center space-x-3">
                           <div className="group-hover:scale-110 transition-transform duration-200">
                             {getInterviewerIcon(session.interviewer_type)}
                           </div>
-                          <span className={`px-3 py-1 rounded-full text-xs font-semibold transform group-hover:scale-105 transition-all duration-200 ${
-                            getInterviewerColor(session.interviewer_type)
-                          }`}>
-                            {session.interviewer_type.replace('_', ' ').toUpperCase()}
-                          </span>
+                          <div>
+                            {session.is_template_based ? (
+                              <span className="px-3 py-1 rounded-full text-xs font-semibold bg-gradient-to-r from-purple-500/20 to-pink-500/20 text-purple-300 border border-purple-400/30 transform group-hover:scale-105 transition-all duration-200">
+                                Template Interview{session.template_job_role ? `: ${session.template_job_role}` : ''}
+                              </span>
+                            ) : (
+                              <span className={`px-3 py-1 rounded-full text-xs font-semibold transform group-hover:scale-105 transition-all duration-200 ${getInterviewerColor(session.interviewer_type)}`}>
+                                {session.interviewer_type.replace('_', ' ').toUpperCase()}
+                              </span>
+                            )}
+                          </div>
                         </div>
+                      </td>                      <td className="py-4 px-6 text-gray-300 font-medium">
+                        {formatDate(session.created_at)}
                       </td>
                       <td className="py-4 px-6 text-gray-300 font-medium">
-                        {formatDate(session.created_at)}
+                        <span className="px-2 py-1 rounded-lg bg-blue-500/20 text-blue-300 border border-blue-400/30">
+                          {session.duration_minutes || 30} min
+                        </span>
                       </td>
                       <td className="py-4 px-6 text-gray-300 font-medium">
                         <span className="px-2 py-1 rounded-lg bg-white/10 text-white">

@@ -152,6 +152,30 @@ class GeminiService:
         
         return questions
     
+    def _parse_questions_response(self, response: str) -> List[str]:
+        """Parse the Gemini response to extract questions"""
+        try:
+            # Try to parse as JSON first
+            import json
+            questions = json.loads(response.strip())
+            if isinstance(questions, list):
+                return [q.strip() for q in questions if q.strip()]
+        except (json.JSONDecodeError, ValueError):
+            pass
+        
+        # Fallback: Split by lines and filter for questions
+        lines = response.strip().split('\n')
+        questions = []
+        for line in lines:
+            line = line.strip()
+            if line and ('?' in line or line.lower().startswith(('what', 'how', 'why', 'when', 'where', 'describe', 'explain', 'tell'))):
+                # Clean up the line
+                line = line.strip('- *1234567890.')
+                if line:
+                    questions.append(line)
+        
+        return questions[:15]  # Cap at 15 questions
+
     async def _ensure_question_count(self, existing_questions: List[str], target_count: int, 
                                    resume_text: str, job_description: str, 
                                    interviewer_type: str, difficulty: str) -> List[str]:
@@ -509,5 +533,251 @@ class GeminiService:
             logger.error(f"Error generating questions with template: {str(e)}")
             # Fallback to standard generation
             return await self.generate_questions(resume_text, job_description, "hr", "medium", num_questions)
+    
+    async def generate_multi_agent_questions_with_template(self, resume_text: str, job_description: str, 
+                                          template: dict, num_questions: int = 5, interviewer_types: List[str] = None) -> List[str]:
+        """Generate interview questions using multiple agents based on template interviewer types"""
+        try:
+            logger.info(f"Generating {num_questions} questions using multi-agent approach with types: {interviewer_types}")
+            
+            # Extract template information
+            key_skills = template.get('key_skills', [])
+            evaluation_criteria = template.get('evaluation_criteria', [])
+            question_distribution = template.get('question_distribution', {})
+            experience_level = template.get('experience_level', 'mid')
+            job_role = template.get('job_role', 'general')
+            
+            # Default interviewer types if not provided
+            if not interviewer_types:
+                interviewer_types = ['hr', 'tech_lead', 'behavioral']
+            
+            # Distribute questions among interviewer types
+            questions_per_type = max(1, num_questions // len(interviewer_types))
+            remaining_questions = num_questions % len(interviewer_types)
+            
+            all_questions = []
+            
+            for i, interviewer_type in enumerate(interviewer_types):
+                # Calculate questions for this interviewer type
+                type_questions = questions_per_type
+                if i < remaining_questions:
+                    type_questions += 1
+                
+                if type_questions == 0:
+                    continue
+                
+                # Get type-specific evaluation criteria
+                type_specific_criteria = self._get_type_specific_criteria(interviewer_type, evaluation_criteria)
+                type_specific_skills = self._get_type_specific_skills(interviewer_type, key_skills)
+                
+                # Create type-specific prompt
+                prompt = f"""
+                You are a {interviewer_type.replace('_', ' ').title()} interviewer for a {job_role.replace('_', ' ').title()} position.
+                Generate {type_questions} interview questions specific to your interviewer role.
+                
+                TARGET ROLE: {job_role.replace('_', ' ').title()}
+                INTERVIEWER TYPE: {interviewer_type.replace('_', ' ').title()}
+                EXPERIENCE LEVEL: {experience_level.title()}
+                
+                RELEVANT SKILLS TO ASSESS: {', '.join(type_specific_skills[:5])}
+                
+                EVALUATION FOCUS: {', '.join(type_specific_criteria[:4])}
+                
+                CANDIDATE RESUME:
+                {resume_text}
+                
+                {f'''JOB DESCRIPTION:
+                {job_description}
+                ''' if job_description and job_description.strip() else '''ROLE FOCUS:
+                Questions should be tailored to the {job_role.replace('_', ' ').title()} role from a {interviewer_type.replace('_', ' ')} perspective.
+                '''}
+                
+                INSTRUCTIONS FOR {interviewer_type.upper()} INTERVIEWER:
+                {self._get_interviewer_instructions(interviewer_type, experience_level)}
+                
+                1. Generate exactly {type_questions} questions
+                2. Each question should end with a question mark
+                3. Focus on {interviewer_type.replace('_', ' ')} aspects of the role
+                4. Match the {experience_level} experience level
+                5. Make questions specific to {job_role.replace('_', ' ')}
+                
+                Return ONLY a JSON array of strings:
+                ["Question 1?", "Question 2?", ...]
+                """
+                
+                response = await self._make_request(prompt)
+                type_questions_list = self._parse_questions_response(response)
+                
+                # Add questions from this interviewer type
+                all_questions.extend(type_questions_list[:type_questions])
+                
+                logger.info(f"Generated {len(type_questions_list[:type_questions])} questions for {interviewer_type}")
+            
+            # Shuffle questions to mix different interviewer types
+            import random
+            random.shuffle(all_questions)
+            
+            logger.info(f"Multi-agent question generation completed: {len(all_questions)} total questions")
+            return all_questions[:num_questions]
+            
+        except Exception as e:
+            logger.error(f"Error in multi-agent question generation: {str(e)}")
+            # Fallback to single-agent generation
+            return await self.generate_questions_with_template(resume_text, job_description, template, num_questions)
+    
+    async def generate_multi_agent_questions_with_distribution(self, resume_text: str, job_description: str, 
+                                          template: dict, question_distribution: dict, total_questions: int = 10) -> List[str]:
+        """Generate interview questions using exact distribution from template"""
+        try:
+            logger.info(f"Generating {total_questions} questions with distribution: {question_distribution}")
+            
+            # Extract template information
+            key_skills = template.get('key_skills', [])
+            evaluation_criteria = template.get('evaluation_criteria', [])
+            experience_level = template.get('experience_level', 'mid')
+            job_role = template.get('job_role', 'general')
+            
+            # Validate distribution
+            if not question_distribution or sum(question_distribution.values()) == 0:
+                logger.warning("No valid question distribution found, falling back to default")
+                return await self.generate_multi_agent_questions_with_template(
+                    resume_text, job_description, template, total_questions, ['hr', 'tech_lead', 'behavioral']
+                )
+            
+            all_questions = []
+            
+            # Generate questions for each interviewer type according to distribution
+            for interviewer_type, question_count in question_distribution.items():
+                if question_count <= 0:
+                    continue
+                
+                logger.info(f"Generating {question_count} questions for {interviewer_type}")
+                
+                # Get type-specific evaluation criteria and skills
+                type_specific_criteria = self._get_type_specific_criteria(interviewer_type, evaluation_criteria)
+                type_specific_skills = self._get_type_specific_skills(interviewer_type, key_skills)
+                
+                # Create type-specific prompt
+                prompt = f"""
+                You are a {interviewer_type.replace('_', ' ').title()} interviewer for a {job_role.replace('_', ' ').title()} position.
+                Generate {question_count} interview questions specific to your interviewer role.
+                
+                TARGET ROLE: {job_role.replace('_', ' ').title()}
+                INTERVIEWER TYPE: {interviewer_type.replace('_', ' ').title()}
+                EXPERIENCE LEVEL: {experience_level.title()}
+                
+                RELEVANT SKILLS TO ASSESS: {', '.join(type_specific_skills[:5])}
+                
+                EVALUATION FOCUS: {', '.join(type_specific_criteria[:4])}
+                
+                CANDIDATE RESUME:
+                {resume_text}
+                
+                {f'''JOB DESCRIPTION:
+                {job_description}
+                ''' if job_description and job_description.strip() else '''ROLE FOCUS:
+                Questions should be tailored to the {job_role.replace('_', ' ').title()} role from a {interviewer_type.replace('_', ' ')} perspective.
+                '''}
+                
+                INSTRUCTIONS FOR {interviewer_type.upper()} INTERVIEWER:
+                {self._get_interviewer_instructions(interviewer_type, experience_level)}
+                
+                1. Generate exactly {question_count} questions
+                2. Each question should end with a question mark
+                3. Focus on {interviewer_type.replace('_', ' ')} aspects of the role
+                4. Match the {experience_level} experience level
+                5. Make questions specific to {job_role.replace('_', ' ')}
+                
+                Return ONLY a JSON array of strings:
+                ["Question 1?", "Question 2?", ...]
+                """
+                
+                response = await self._make_request(prompt)
+                type_questions_list = self._parse_questions_response(response)
+                
+                # Add exactly the required number of questions from this interviewer type
+                questions_to_add = type_questions_list[:question_count]
+                all_questions.extend(questions_to_add)
+                
+                logger.info(f"Generated {len(questions_to_add)} questions for {interviewer_type}")
+            
+            # The questions are now in the correct order according to distribution
+            # No need to shuffle as we want to maintain the distribution order
+            
+            logger.info(f"Question generation with distribution completed: {len(all_questions)} total questions")
+            return all_questions[:total_questions]
+            
+        except Exception as e:
+            logger.error(f"Error in distribution-based question generation: {str(e)}")
+            # Fallback to template-based generation
+            return await self.generate_multi_agent_questions_with_template(
+                resume_text, job_description, template, total_questions, list(question_distribution.keys())
+            )
+    
+    def _get_type_specific_criteria(self, interviewer_type: str, criteria: List[str]) -> List[str]:
+        """Filter evaluation criteria relevant to interviewer type"""
+        type_keywords = {
+            'hr': ['communication', 'culture', 'fit', 'motivation', 'leadership', 'teamwork', 'values'],
+            'tech_lead': ['technical', 'coding', 'architecture', 'system', 'design', 'problem', 'scalability'],
+            'behavioral': ['experience', 'situation', 'challenge', 'conflict', 'achievement', 'failure', 'growth']
+        }
+        
+        keywords = type_keywords.get(interviewer_type, [])
+        relevant_criteria = []
+        
+        for criterion in criteria:
+            if any(keyword in criterion.lower() for keyword in keywords):
+                relevant_criteria.append(criterion)
+        
+        # If no specific criteria found, return some general ones
+        if not relevant_criteria:
+            relevant_criteria = criteria[:3]
+        
+        return relevant_criteria
+    
+    def _get_type_specific_skills(self, interviewer_type: str, skills: List[str]) -> List[str]:
+        """Filter skills relevant to interviewer type"""
+        if interviewer_type == 'hr':
+            # HR focuses on soft skills and general qualifications
+            soft_skills = ['communication', 'leadership', 'teamwork', 'management', 'planning', 'organization']
+            return [skill for skill in skills if any(soft in skill.lower() for soft in soft_skills)] or skills[:3]
+        elif interviewer_type == 'tech_lead':
+            # Tech lead focuses on technical skills
+            tech_keywords = ['programming', 'development', 'software', 'technical', 'coding', 'system', 'architecture']
+            return [skill for skill in skills if any(tech in skill.lower() for tech in tech_keywords)] or skills[:5]
+        elif interviewer_type == 'behavioral':
+            # Behavioral focuses on experience-based skills
+            return skills[:4]  # All skills can be relevant for behavioral questions
+        
+        return skills[:3]
+    
+    def _get_interviewer_instructions(self, interviewer_type: str, experience_level: str) -> str:
+        """Get specific instructions for each interviewer type"""
+        instructions = {
+            'hr': {
+                'junior': "Focus on cultural fit, basic communication skills, motivation, and learning attitude. Ask about career goals and team collaboration.",
+                'mid': "Evaluate leadership potential, conflict resolution, team management, and strategic thinking. Include scenario-based questions.",
+                'senior': "Assess executive presence, organizational change management, strategic vision, and complex stakeholder management."
+            },
+            'tech_lead': {
+                'junior': "Test fundamental technical concepts, basic problem-solving, and learning ability. Focus on code quality and best practices.",
+                'mid': "Evaluate system design skills, technical leadership, architecture decisions, and mentoring capabilities.",
+                'senior': "Assess advanced architecture patterns, scalability challenges, technical strategy, and cross-team technical leadership."
+            },
+            'behavioral': {
+                'junior': "Use simple STAR method questions about learning experiences, basic challenges, and team collaboration.",
+                'mid': "Explore complex project management, leadership situations, difficult decisions, and professional growth.",
+                'senior': "Deep-dive into strategic initiatives, organizational transformation, crisis management, and long-term vision execution."
+            }
+        }
+        
+        return instructions.get(interviewer_type, {}).get(experience_level, "Ask relevant questions for this role and experience level.")
 
-    # ...existing code...
+    async def _make_request(self, prompt: str) -> str:
+        """Make a request to Gemini API with the given prompt"""
+        try:
+            response = await self.generate_content(prompt)
+            return response
+        except Exception as e:
+            logger.error(f"Error making Gemini request: {str(e)}")
+            raise

@@ -179,13 +179,13 @@ export const interviewAPI = {  // Start new interview session
     return response.data;
   },
 
-  // Get session recordings
-  getSessionRecordings: async (sessionId) => {
-    const response = await apiClient.get(`/interview/recordings/${sessionId}`);
+  // List all interview recordings (metadata only)
+  listRecordings: async () => {
+    const response = await apiClient.get('/interview/recordings');
     return response.data;
   },
 
-  // Get specific recording (including audio data)
+  // Get single interview recording (including audio_data)
   getRecording: async (recordingId) => {
     const response = await apiClient.get(`/interview/recording/${recordingId}`);
     return response.data;
@@ -312,6 +312,25 @@ export const voiceAPI = {
     const response = await apiClient.post('/voice/quick-analyze', {
       transcript,
       duration
+    });
+    return response.data;
+  },
+
+  // Practice voice analysis (transcript-only detailed analysis)
+  practiceAnalyze: async ({ transcript, duration }) => {
+    const response = await apiClient.post('/voice/practice-analyze', {
+      transcript,
+      duration
+    });
+    return response.data;
+  },
+
+  // Practice detailed voice analysis (with audio data)
+  practiceDetailedAnalyze: async ({ transcript, duration, audio_data }) => {
+    const response = await apiClient.post('/voice/practice-detailedanalyze', {
+      transcript,
+      duration,
+      audio_data
     });
     return response.data;
   },

@@ -145,9 +145,13 @@ const useVoiceRecording = ({ onTranscriptionComplete, onRecordingStop }) => {
       
       if (transcription && transcription.trim()) {
         console.log('Transcription successful:', transcription);
-        
-        if (onTranscriptionComplete) {
-          onTranscriptionComplete(transcription);
+          if (onTranscriptionComplete) {
+          onTranscriptionComplete({
+            transcript: transcription,
+            audioData: audioBlob,
+            duration: duration,
+            durationSeconds: duration
+          });
         }
         
         toast.success('🎉 Voice transcribed successfully!', {

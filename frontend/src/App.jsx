@@ -15,6 +15,7 @@ import Templates from './pages/Templates';
 // import EnhancedTemplates from './pages/EnhancedTemplates';
 
 import Voice from './pages/Voice';
+import VoiceAnalysisPage from './pages/VoiceAnalysisPage';
 import Test from './pages/Test';
 import ConnectionTest from './pages/ConnectionTest';
 
@@ -63,11 +64,18 @@ function AppContent() {
               <ProtectedRoute>
                 <EnhancedTemplates />
               </ProtectedRoute>
-            } /> */}<Route path="/voice-analysis" element={
+            } /> */}            
+            {/* <Route path="/voice" element={
               <ProtectedRoute>
                 <Voice />
               </ProtectedRoute>
-            } />            <Route path="/test" element={<Test />} />
+            } /> */}
+            <Route path="/voice-analysis" element={
+              <ProtectedRoute>
+                {/* <VoiceAnalysisPage /> */}
+              </ProtectedRoute>
+            } />
+            <Route path="/test" element={<Test />} />
             <Route path="/connection-test" element={<ConnectionTest />} />
             {/* Demo/Test Routes */}
           </Routes>

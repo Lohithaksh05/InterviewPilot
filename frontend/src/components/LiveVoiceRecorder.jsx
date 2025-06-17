@@ -1,30 +1,28 @@
 import React, { useState } from 'react';
-import { Mic, MicOff, Play, Pause, RotateCcw, FileText, Volume2 } from 'lucide-react';
-import useVoiceRecording from '../hooks/useVoiceRecording';
+import { Mic, MicOff, Play, Pause, RotateCcw, FileText, Volume2, MessageCircle } from 'lucide-react';
+import useLiveVoiceRecording from '../hooks/useLiveVoiceRecording';
 
-const VoiceRecorder = ({ onTranscriptionComplete, className = '' }) => {
+const LiveVoiceRecorder = ({ onTranscriptionComplete, className = '' }) => {
   const [audioPlaying, setAudioPlaying] = useState(false);
   const [audioElement, setAudioElement] = useState(null);
+  
   const {
     isRecording,
     audioURL,
     duration,
     durationSeconds,
-    isTranscribing,
     error,
+    liveTranscript,
     isSupported,
+    isSpeechRecognitionSupported,
     startRecording,
     stopRecording,
     transcribeAudio,
     resetRecording
-  } = useVoiceRecording({
+  } = useLiveVoiceRecording({
     onTranscriptionComplete,
     onRecordingStop: (blob, duration) => {
       console.log('Recording stopped', { blob, duration });
-      // Automatically trigger transcription after recording stops
-      setTimeout(() => {
-        transcribeAudio();
-      }, 300); // slight delay to ensure blob is ready
     }
   });
 
@@ -59,6 +57,7 @@ const VoiceRecorder = ({ onTranscriptionComplete, className = '' }) => {
     }
     resetRecording();
   };
+
   if (!isSupported) {
     return (
       <div className={`glass-morphism-dark rounded-xl p-4 border border-red-500/20 ${className}`}>
@@ -77,7 +76,7 @@ const VoiceRecorder = ({ onTranscriptionComplete, className = '' }) => {
         <div className="flex items-center justify-between">
           <h3 className="text-lg font-medium text-white flex items-center">
             <Volume2 className="w-5 h-5 mr-2 text-purple-400" />
-            Voice Answer
+            Voice Practice
           </h3>
           {durationSeconds > 0 && (
             <span className="text-sm text-gray-300 font-mono bg-gray-800/50 px-2 py-1 rounded">
@@ -86,22 +85,45 @@ const VoiceRecorder = ({ onTranscriptionComplete, className = '' }) => {
           )}
         </div>
 
+        {/* Speech Recognition Status */}
+        {!isSpeechRecognitionSupported && (
+          <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-3">
+            <p className="text-sm text-yellow-300">
+              ⚠️ Live transcription not available - you can still record and get basic analysis
+            </p>
+          </div>
+        )}
+
         {/* Error Message */}
         {error && (
           <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3">
             <p className="text-sm text-red-300">{error}</p>
           </div>
-        )}        {/* Recording Controls */}
+        )}
+
+        {/* Live Transcript Display */}
+        {isRecording && liveTranscript && (
+          <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3">
+            <div className="flex items-center gap-2 mb-2">
+              <MessageCircle className="w-4 h-4 text-blue-400" />
+              <span className="text-sm font-medium text-blue-300">Live Transcript</span>
+            </div>
+            <p className="text-sm text-gray-300 leading-relaxed">
+              {liveTranscript}
+            </p>
+          </div>
+        )}
+
+        {/* Recording Controls */}
         <div className="flex items-center gap-3">
           {/* Record Button */}
           <button
             onClick={handleRecordToggle}
-            disabled={isTranscribing}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
               isRecording
                 ? 'bg-red-500/20 text-red-300 hover:bg-red-500/30 animate-pulse border border-red-500/30'
                 : 'bg-purple-500/20 text-purple-300 hover:bg-purple-500/30 border border-purple-500/30'
-            } disabled:opacity-50 disabled:cursor-not-allowed`}
+            }`}
           >
             {isRecording ? (
               <>
@@ -120,7 +142,7 @@ const VoiceRecorder = ({ onTranscriptionComplete, className = '' }) => {
           {audioURL && (
             <button
               onClick={handlePlayPause}
-              disabled={isRecording || isTranscribing}
+              disabled={isRecording}
               className="flex items-center gap-2 px-4 py-2 bg-green-500/20 text-green-300 rounded-lg hover:bg-green-500/30 border border-green-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {audioPlaying ? (
@@ -141,19 +163,23 @@ const VoiceRecorder = ({ onTranscriptionComplete, className = '' }) => {
           {(audioURL || isRecording) && (
             <button
               onClick={handleReset}
-              disabled={isTranscribing}
-              className="flex items-center gap-2 px-4 py-2 bg-gray-500/20 text-gray-300 rounded-lg hover:bg-gray-500/30 border border-gray-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex items-center gap-2 px-4 py-2 bg-gray-500/20 text-gray-300 rounded-lg hover:bg-gray-500/30 border border-gray-500/30 transition-colors"
             >
               <RotateCcw className="w-4 h-4" />
               Reset
             </button>
           )}
-        </div>        {/* Recording Status */}
+        </div>
+
+        {/* Recording Status */}
         {isRecording && (
           <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3">
             <div className="flex items-center text-red-300">
               <div className="w-2 h-2 bg-red-400 rounded-full animate-pulse mr-2"></div>
-              <span className="text-sm font-medium">Recording in progress... Speak clearly into your microphone</span>
+              <span className="text-sm font-medium">
+                Recording in progress... 
+                {isSpeechRecognitionSupported ? ' Speak clearly for live transcription' : ' Speak clearly into your microphone'}
+              </span>
             </div>
           </div>
         )}
@@ -166,38 +192,31 @@ const VoiceRecorder = ({ onTranscriptionComplete, className = '' }) => {
                 <div className="w-2 h-2 bg-green-400 rounded-full mr-2"></div>
                 <span className="text-sm">Recording completed ({duration})</span>
               </div>
-              <button
-                onClick={transcribeAudio}
-                disabled={isTranscribing}
-                className="flex items-center gap-1 text-sm text-green-300 hover:text-green-200 disabled:opacity-50 transition-colors"
-              >
-                <FileText className="w-4 h-4" />
-                {isTranscribing ? 'Transcribing...' : 'Convert to Text'}
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Transcription Status */}
-        {isTranscribing && (
-          <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3">
-            <div className="flex items-center text-blue-300">
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-400 mr-2"></div>
-              <span className="text-sm">Converting speech to text...</span>
+              {!liveTranscript && (
+                <button
+                  onClick={transcribeAudio}
+                  className="flex items-center gap-1 text-sm text-green-300 hover:text-green-200 transition-colors"
+                >
+                  <FileText className="w-4 h-4" />
+                  Get Transcript
+                </button>
+              )}
             </div>
           </div>
         )}
 
         {/* Instructions */}
         <div className="text-xs text-gray-400 space-y-1">
-          <p>• Click "Start Recording" to begin recording your answer</p>
+          <p>• Click "Start Recording" to begin recording with {isSpeechRecognitionSupported ? 'live transcription' : 'audio capture'}</p>
           <p>• Speak clearly into your microphone</p>
           <p>• Click "Stop Recording" when you're finished</p>
-          <p>• Use "Convert to Text" to add the transcription to your answer</p>
+          {isSpeechRecognitionSupported && (
+            <p>• Your speech will be transcribed in real-time for instant analysis</p>
+          )}
         </div>
       </div>
     </div>
   );
 };
 
-export default VoiceRecorder;
+export default LiveVoiceRecorder;
