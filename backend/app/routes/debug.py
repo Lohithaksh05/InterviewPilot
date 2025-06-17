@@ -1,10 +1,12 @@
 from fastapi import APIRouter, HTTPException, Depends
 import logging
 import os
+from datetime import datetime
 from decouple import config
 from ..services.auth_service import get_current_user
 from ..models.user_models import User
 from ..services.interview_service import InterviewService
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -223,3 +225,106 @@ async def test_session_creation(current_user: User = Depends(get_current_user)):
     except Exception as e:
         logger.error(f"Error creating test session: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Session creation failed: {str(e)}")
+
+@router.get("/recordings")
+async def debug_recordings():
+    """Debug endpoint to check recordings in database"""
+    try:
+        from ..database import get_database, is_connected
+        from ..database.memory_db import memory_db
+        
+        result = {
+            "mongodb_connected": is_connected(),
+            "recordings_count": 0,
+            "recordings": []
+        }
+        
+        if is_connected():
+            db = get_database()
+            recordings_collection = db.interview_recordings
+            
+            # Count total recordings
+            count = await recordings_collection.count_documents({})
+            result["recordings_count"] = count
+            
+            # Get first 10 recordings (without audio_data for brevity)
+            cursor = recordings_collection.find({}).limit(10)
+            recordings = []
+            async for recording in cursor:
+                recording_copy = recording.copy()
+                recording_copy.pop("audio_data", None)  # Remove large audio data
+                recording_copy["_id"] = str(recording_copy["_id"])  # Convert ObjectId to string
+                recordings.append(recording_copy)
+            
+            result["recordings"] = recordings
+        else:
+            # Check memory database
+            if hasattr(memory_db, 'recordings'):
+                result["recordings_count"] = len(memory_db.recordings)
+                result["recordings"] = [
+                    {k: v for k, v in recording.items() if k != "audio_data"}
+                    for recording in list(memory_db.recordings.values())[:10]
+                ]
+            else:
+                result["recordings_count"] = 0
+                result["recordings"] = []
+        
+        return result
+        
+    except Exception as e:
+        logger.error(f"Debug recordings error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Debug error: {str(e)}")
+
+@router.get("/current-user")
+async def debug_current_user(current_user: User = Depends(get_current_user)):
+    """Debug endpoint to check current user information"""
+    try:
+        return {
+            "user_id": str(current_user.id),
+            "username": getattr(current_user, 'username', 'N/A'),
+            "email": getattr(current_user, 'email', 'N/A'),
+            "user_object": {
+                "id": str(current_user.id),
+                "attributes": [attr for attr in dir(current_user) if not attr.startswith('_')]
+            }
+        }
+    except Exception as e:
+        logger.error(f"Debug current user error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Debug error: {str(e)}")
+
+@router.post("/create-test-recording")
+async def create_test_recording(current_user: User = Depends(get_current_user)):
+    """Create a test recording for the current user for testing purposes"""
+    try:
+        import base64
+        from ..services.interview_service import InterviewService
+        
+        interview_service = InterviewService()
+        
+        # Create dummy audio data (small base64 encoded audio)
+        dummy_audio = base64.b64encode(b"dummy audio data for testing").decode('utf-8')
+        
+        recording_data = {
+            'user_id': str(current_user.id),
+            'session_id': 'test-session-' + str(current_user.id),
+            'question_index': 0,
+            'audio_data': dummy_audio,
+            'duration': 5.0,
+            'transcript': 'This is a test recording for voice analysis',
+            'file_size': len(dummy_audio),
+            'mime_type': 'audio/webm',
+            'created_at': datetime.now()
+        }
+        
+        recording_id = await interview_service.save_recording(recording_data)
+        
+        return {
+            "success": True,
+            "recording_id": recording_id,
+            "user_id": str(current_user.id),
+            "message": "Test recording created successfully"
+        }
+        
+    except Exception as e:
+        logger.error(f"Error creating test recording: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error creating test recording: {str(e)}")

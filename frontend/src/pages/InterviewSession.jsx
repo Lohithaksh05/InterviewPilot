@@ -99,12 +99,19 @@ const InterviewSession = () => {
       reader.readAsDataURL(blob);
     });
   };
-
   // Upload recording to database
   const uploadRecording = useCallback(async (recordingData) => {
     if (!recordingData || !recordingData.audioBlob) {
+      console.log('No recording data or audio blob');
       return;
     }
+
+    console.log('Recording data received for upload:', {
+      duration: recordingData.duration,
+      transcript: recordingData.transcript,
+      audioBlobSize: recordingData.audioBlob?.size,
+      recordingData: recordingData
+    });
 
     try {
       const base64Audio = await convertBlobToBase64(recordingData.audioBlob);
@@ -119,11 +126,23 @@ const InterviewSession = () => {
         mime_type: recordingData.audioBlob.type || 'audio/webm'
       };
 
+      console.log('Upload data being sent:', {
+        session_id: uploadData.session_id,
+        question_index: uploadData.question_index,
+        duration: uploadData.duration,
+        transcript: uploadData.transcript,
+        file_size: uploadData.file_size,
+        mime_type: uploadData.mime_type,
+        audio_data_length: uploadData.audio_data?.length
+      });
+
       const response = await interviewAPI.saveRecording(uploadData);
       
       if (!response.success) {
         throw new Error('Upload failed');
       }
+      
+      console.log('Recording uploaded successfully:', response);
     } catch (error) {
       console.error('Error uploading recording:', error);
     }

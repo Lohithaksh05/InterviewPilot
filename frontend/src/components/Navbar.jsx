@@ -148,7 +148,7 @@ const Navbar = () => {
                   }`}
                 >
                   <Mic className="h-5 w-5 group-hover:animate-pulse" />
-                  <span>Voice</span>
+                  <span>Voice Analysis</span>
                 </Link>
               </>
             )}

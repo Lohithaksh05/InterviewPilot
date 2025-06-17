@@ -72,7 +72,7 @@ function AppContent() {
             } /> */}
             <Route path="/voice-analysis" element={
               <ProtectedRoute>
-                {/* <VoiceAnalysisPage /> */}
+                <VoiceAnalysisPage />
               </ProtectedRoute>
             } />
             <Route path="/test" element={<Test />} />

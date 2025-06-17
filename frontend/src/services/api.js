@@ -178,10 +178,15 @@ export const interviewAPI = {  // Start new interview session
     const response = await apiClient.post('/interview/save-recording', recordingData);
     return response.data;
   },
-
   // List all interview recordings (metadata only)
   listRecordings: async () => {
     const response = await apiClient.get('/interview/recordings');
+    return response.data;
+  },
+
+  // Get recordings for a specific session
+  getSessionRecordings: async (sessionId) => {
+    const response = await apiClient.get(`/interview/recordings/${sessionId}`);
     return response.data;
   },
 

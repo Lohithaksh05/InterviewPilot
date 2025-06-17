@@ -6,6 +6,7 @@ from ..models.voice_models import (
     VoiceMetrics, VoiceAnalysisResult, FillerWordAnalysis, 
     VoicePattern, VoiceCoachingTip
 )
+from ..models.interview_models import get_ist_now
 from datetime import datetime
 import logging
 import re
@@ -70,7 +71,7 @@ class VoiceAnalysisService:
                 specific_feedback=specific_feedback,
                 previous_performance=previous_performance,
                 benchmark_comparison=benchmark_comparison,
-                analyzed_at=datetime.utcnow()
+                analyzed_at=get_ist_now()
             )
             
         except Exception as e:
@@ -413,9 +414,8 @@ class VoiceAnalysisService:
             voice_metrics=basic_metrics,
             filler_words=[],
             speech_segments=[],
-            overall_score=70.0,
-            improvement_areas=["Analysis data limited - try recording with better audio quality"],
+            overall_score=70.0,            improvement_areas=["Analysis data limited - try recording with better audio quality"],
             strengths=["Successfully completed voice recording"],
             specific_feedback="Voice analysis completed with limited data. For better insights, ensure clear audio recording.",
-            analyzed_at=datetime.utcnow()
+            analyzed_at=get_ist_now()
         )

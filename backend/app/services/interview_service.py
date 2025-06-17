@@ -108,7 +108,7 @@ class InterviewService:
                             "answers": answer,
                             "feedback": feedback
                         },
-                        "$set": {"updated_at": datetime.utcnow()}
+                        "$set": {"updated_at": get_ist_now()}
                     }
                 )
                 return result.modified_count > 0
@@ -118,16 +118,15 @@ class InterviewService:
                 if session_data:
                     session_data["answers"].append(answer)
                     session_data["feedback"].append(feedback)
-                    session_data["updated_at"] = datetime.utcnow()
+                    session_data["updated_at"] = get_ist_now()
                     return True
         except Exception as e:
-            logger.error(f"Error adding answer: {str(e)}")
-            # Fallback to memory database
+            logger.error(f"Error adding answer: {str(e)}")            # Fallback to memory database
             session_data = memory_db.find_session(session_id, user_id)
             if session_data:
                 session_data["answers"].append(answer)
                 session_data["feedback"].append(feedback)
-                session_data["updated_at"] = datetime.utcnow()
+                session_data["updated_at"] = get_ist_now()
                 return True
         
         return False
@@ -228,11 +227,10 @@ class InterviewService:
                 sessions_collection = db.interview_sessions
                 
                 result = await sessions_collection.update_one(
-                    {"session_id": session_id, "user_id": user_id},
-                    {
+                    {"session_id": session_id, "user_id": user_id},                    {
                         "$set": {
                             "completed": completed,
-                            "updated_at": datetime.utcnow()
+                            "updated_at": get_ist_now()
                         }
                     }
                 )
@@ -242,15 +240,14 @@ class InterviewService:
                 session_data = memory_db.find_session(session_id, user_id)
                 if session_data:
                     session_data["completed"] = completed
-                    session_data["updated_at"] = datetime.utcnow()
+                    session_data["updated_at"] = get_ist_now()
                     return True
         except Exception as e:
-            logger.error(f"Error updating session completion: {str(e)}")
-            # Fallback to memory database
+            logger.error(f"Error updating session completion: {str(e)}")            # Fallback to memory database
             session_data = memory_db.find_session(session_id, user_id)
             if session_data:
                 session_data["completed"] = completed
-                session_data["updated_at"] = datetime.utcnow()
+                session_data["updated_at"] = get_ist_now()
                 return True
         
         return False

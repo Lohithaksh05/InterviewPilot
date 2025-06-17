@@ -55,13 +55,15 @@ class SpeechToTextService {
     this.recognition.lang = 'en-US';
     this.recognition.maxAlternatives = 1;
 
-    // Set up event handlers
+    // Set up event handlers    
     this.recognition.onresult = (event) => {
+      console.log('Speech recognition result event:', event);
       let finalTranscript = '';
       let interimTranscript = '';
 
       for (let i = event.resultIndex; i < event.results.length; i++) {
         const transcript = event.results[i][0].transcript;
+        console.log(`Result ${i}: "${transcript}", isFinal: ${event.results[i].isFinal}`);
         
         if (event.results[i].isFinal) {
           finalTranscript += transcript;
@@ -69,6 +71,9 @@ class SpeechToTextService {
           interimTranscript += transcript;
         }
       }
+
+      console.log('Final transcript:', finalTranscript);
+      console.log('Interim transcript:', interimTranscript);
 
       if (this.onResult) {
         this.onResult({
@@ -97,10 +102,11 @@ class SpeechToTextService {
       this.isListening = true;
     };
   }
-
   // Start listening
   startListening(callbacks = {}) {
+    console.log('SpeechToTextService: startListening called');
     if (this.isListening) {
+      console.log('Already listening, rejecting');
       return Promise.reject(new Error('Already listening'));
     }
 
@@ -110,12 +116,15 @@ class SpeechToTextService {
 
     try {
       if (!this.recognition) {
+        console.log('Initializing speech recognition...');
         this.initialize();
       }
       
+      console.log('Starting speech recognition...');
       this.recognition.start();
       return Promise.resolve();
     } catch (error) {
+      console.error('Error starting speech recognition:', error);
       return Promise.reject(error);
     }
   }

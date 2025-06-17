@@ -428,22 +428,22 @@ Recommendation: ${summary?.overall_summary?.recommendation || 'N/A'}
               </Link>
             </div>
           </div>          {/* Overall Score Cards */}
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 animate-fade-in-up animation-delay-200">
-            {/* Overall Score */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-fade-in-up animation-delay-200">            {/* Overall Score */}
             <div className="group glass-card relative overflow-hidden transform hover:scale-105 transition-all duration-500 hover:shadow-2xl hover:shadow-cyan-500/25">
               <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/10 to-purple-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-              <div className="relative z-10 text-center space-y-4 p-6">                <div className="relative inline-block">
-                  <div className="text-5xl font-bold bg-gradient-to-r from-cyan-400 to-purple-400 bg-clip-text text-transparent animate-pulse">
+              <div className="relative z-10 text-center space-y-2 p-4">
+                <div className="relative inline-block">
+                  <div className="text-3xl font-bold bg-gradient-to-r from-cyan-400 to-purple-400 bg-clip-text text-transparent animate-pulse">
                     {summary?.average_score || 0}/10
                   </div>
                   <div className="absolute -inset-2 bg-gradient-to-r from-cyan-400/20 to-purple-400/20 rounded-full blur-lg opacity-50 animate-pulse"></div>
                 </div>
-                <p className="text-lg font-semibold text-white">Overall Score</p>
+                <p className="text-sm font-semibold text-white">Overall Score</p>
                 <div className="flex justify-center space-x-1">
                   {[1, 2, 3, 4, 5].map((star) => (
                     <Star
                       key={star}
-                      className={`h-6 w-6 transition-all duration-300 ${
+                      className={`h-4 w-4 transition-all duration-300 ${
                         star <= Math.round((summary?.average_score || 0) / 2)
                           ? 'text-yellow-400 fill-yellow-400 animate-pulse'
                           : 'text-gray-500'
@@ -454,64 +454,42 @@ Recommendation: ${summary?.overall_summary?.recommendation || 'N/A'}
               </div>
               <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-cyan-400 to-purple-400 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-500"></div>
             </div>
-            
-            {/* Questions Answered */}
+              {/* Questions Answered */}
             <div className="group glass-card relative overflow-hidden transform hover:scale-105 transition-all duration-500 hover:shadow-2xl hover:shadow-green-500/25">
               <div className="absolute inset-0 bg-gradient-to-br from-green-500/10 to-emerald-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-              <div className="relative z-10 p-6">
-                <div className="flex items-center space-x-4">
+              <div className="relative z-10 p-4">
+                <div className="flex items-center space-x-3">
                   <div className="relative">
-                    <Target className="h-10 w-10 text-green-400 transition-all duration-300" />
+                    <Target className="h-8 w-8 text-green-400 transition-all duration-300" />
                     <div className="absolute inset-0 bg-green-400/20 rounded-full blur-lg animate-ping opacity-75"></div>
                   </div>
                   <div className="space-y-1">
-                    <p className="text-3xl font-bold text-white">{summary.answered_questions}</p>
-                    <p className="text-sm text-gray-300">Questions Answered</p>
+                    <p className="text-2xl font-bold text-white">{summary.answered_questions}</p>
+                    <p className="text-xs text-gray-300">Questions Answered</p>
                   </div>
                 </div>
               </div>
               <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-green-400 to-emerald-400 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-500"></div>
             </div>
-            
-            {/* Recommendation */}
+              {/* Recommendation */}
             <div className="group glass-card relative overflow-hidden transform hover:scale-105 transition-all duration-500 hover:shadow-2xl hover:shadow-blue-500/25">
               <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 to-indigo-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-              <div className="relative z-10 p-6">
-                <div className="flex items-center space-x-4">
+              <div className="relative z-10 p-4">
+                <div className="flex items-center space-x-3">
                   <div className="relative">
-                    <TrendingUp className="h-10 w-10 text-blue-400 group-hover:animate-bounce transition-all duration-300" />
+                    <TrendingUp className="h-8 w-8 text-blue-400 group-hover:animate-bounce transition-all duration-300" />
                     <div className="absolute inset-0 bg-blue-400/20 rounded-full blur-lg animate-ping opacity-75"></div>
                   </div>
                   <div className="space-y-1">
-                    <p className="text-2xl font-bold text-white">
+                    <p className="text-lg font-bold text-white">
                       {summary.overall_summary?.recommendation?.includes('hire') ? 'Positive' : 'Needs Work'}
                     </p>
-                    <p className="text-sm text-gray-300">Recommendation</p>
-                  </div>
-                </div>
-              </div>              <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-400 to-indigo-400 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-500"></div>
-            </div>
-
-            {/* Time Taken */}
-            <div className="group glass-card relative overflow-hidden transform hover:scale-105 transition-all duration-500 hover:shadow-2xl hover:shadow-purple-500/25">
-              <div className="absolute inset-0 bg-gradient-to-br from-purple-500/10 to-pink-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-              <div className="relative z-10 p-6">
-                <div className="flex items-center space-x-4">
-                  <div className="relative">
-                    <Clock className="h-10 w-10 text-purple-400 group-hover:animate-pulse transition-all duration-300" />
-                    <div className="absolute inset-0 bg-purple-400/20 rounded-full blur-lg animate-ping opacity-75"></div>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-2xl font-bold text-white">
-                      {summary.timing?.duration_formatted || 'N/A'}
-                    </p>
-                    <p className="text-sm text-gray-300">Time Taken</p>
+                    <p className="text-xs text-gray-300">Recommendation</p>
                   </div>
                 </div>
               </div>
-              <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-purple-400 to-pink-400 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-500"></div>
-            </div>
-          </div>{/* Overall Summary */}
+              <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-400 to-indigo-400 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-500"></div>
+            </div></div>{/* Overall Summary */}
           {summary.overall_summary && (
             <div className="glass-card animate-fade-in-up animation-delay-400 group transform hover:scale-[1.02] transition-all duration-500">
               <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-purple-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500 rounded-3xl"></div>

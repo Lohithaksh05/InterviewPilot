@@ -5,11 +5,13 @@ This simulates MongoDB operations using Python dictionaries
 from typing import Dict, List, Optional, Any
 from datetime import datetime
 import uuid
+from ..models.interview_models import get_ist_now
 
 class InMemoryDB:
     def __init__(self):
         self.users: Dict[str, Dict] = {}
         self.sessions: Dict[str, Dict] = {}
+        self.recordings: Dict[str, Dict] = {}  # Add recordings storage
         
     # User operations
     def create_user(self, user_data: Dict) -> Dict:
@@ -18,8 +20,8 @@ class InMemoryDB:
             "_id": user_id,
             "id": user_id,
             **user_data,
-            "created_at": datetime.utcnow(),
-            "updated_at": datetime.utcnow()
+            "created_at": get_ist_now(),
+            "updated_at": get_ist_now()
         }
         self.users[user_id] = user
         return user
@@ -42,7 +44,7 @@ class InMemoryDB:
     def update_user(self, user_id: str, update_data: Dict) -> bool:
         if user_id in self.users:
             self.users[user_id].update(update_data)
-            self.users[user_id]["updated_at"] = datetime.utcnow()
+            self.users[user_id]["updated_at"] = get_ist_now()
             return True
         return False
     
@@ -52,8 +54,8 @@ class InMemoryDB:
         session = {
             "_id": session_id,
             **session_data,
-            "created_at": datetime.utcnow(),
-            "updated_at": datetime.utcnow()
+            "created_at": get_ist_now(),
+            "updated_at": get_ist_now()
         }
         self.sessions[session_id] = session
         return session
@@ -72,7 +74,7 @@ class InMemoryDB:
         session = self.sessions.get(session_id)
         if session and session.get("user_id") == user_id:
             session.update(update_data)
-            session["updated_at"] = datetime.utcnow()
+            session["updated_at"] = get_ist_now()
             return True
         return False
     

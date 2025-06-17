@@ -647,10 +647,10 @@ const Interview = () => {
                     color: 'white'
                   }}
                 >
-                  <option value={3} style={{ backgroundColor: '#1f2937', color: 'white' }}>3 Questions (15 mins)</option>
-                  <option value={5} style={{ backgroundColor: '#1f2937', color: 'white' }}>5 Questions (25 mins)</option>
-                  <option value={8} style={{ backgroundColor: '#1f2937', color: 'white' }}>8 Questions (40 mins)</option>
-                  <option value={10} style={{ backgroundColor: '#1f2937', color: 'white' }}>10 Questions (50 mins)</option>
+                  <option value={3} style={{ backgroundColor: '#1f2937', color: 'white' }}>3 Questions</option>
+                  <option value={5} style={{ backgroundColor: '#1f2937', color: 'white' }}>5 Questions</option>
+                  <option value={8} style={{ backgroundColor: '#1f2937', color: 'white' }}>8 Questions</option>
+                  <option value={10} style={{ backgroundColor: '#1f2937', color: 'white' }}>10 Questions</option>
                 </select>
               </div>
 

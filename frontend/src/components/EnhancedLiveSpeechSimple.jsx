@@ -17,8 +17,7 @@ const EnhancedLiveSpeech = forwardRef(({
   const [duration, setDuration] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
   const [audioDuration, setAudioDuration] = useState(0);
-  
-  // Refs
+    // Refs
   const speechServiceRef = useRef(null);
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
@@ -26,7 +25,19 @@ const EnhancedLiveSpeech = forwardRef(({
   const timerRef = useRef(null);
   const startTimeRef = useRef(null);
   const audioElementRef = useRef(null);
-  const lastRecordingDataRef = useRef(null);  // Initialize speech service
+  const lastRecordingDataRef = useRef(null);  const transcriptRef = useRef(''); // Store current transcript
+  const interimTranscriptRef = useRef(''); // Store current interim transcript
+
+  // Keep refs in sync with state
+  useEffect(() => {
+    transcriptRef.current = transcript;
+  }, [transcript]);
+
+  useEffect(() => {
+    interimTranscriptRef.current = interimTranscript;
+  }, [interimTranscript]);
+
+  // Initialize speech service
   useEffect(() => {
     speechServiceRef.current = new SpeechToTextService();
     
@@ -66,7 +77,6 @@ const EnhancedLiveSpeech = forwardRef(({
       window.MediaRecorder
     );
   };
-
   // Start enhanced live speech (transcription + recording)
   const startEnhancedLiveSpeech = async () => {
     if (!isSupported()) {
@@ -74,12 +84,19 @@ const EnhancedLiveSpeech = forwardRef(({
       return;
     }
 
-    try {
+    try {      console.log('Starting enhanced live speech...');
       setIsActive(true);
       setTranscript('');
       setInterimTranscript('');
       
+      // Clear refs too
+      transcriptRef.current = '';
+      interimTranscriptRef.current = '';
+      
+      console.log('Initial transcript and refs cleared');
+      
       // Request microphone permission
+      console.log('Requesting microphone access...');
       const stream = await navigator.mediaDevices.getUserMedia({ 
         audio: {
           echoCancellation: true,
@@ -89,6 +106,7 @@ const EnhancedLiveSpeech = forwardRef(({
         } 
       });
       
+      console.log('Microphone access granted');
       streamRef.current = stream;
       audioChunksRef.current = [];
 
@@ -103,19 +121,38 @@ const EnhancedLiveSpeech = forwardRef(({
         if (event.data.size > 0) {
           audioChunksRef.current.push(event.data);
         }
-      };
-      
-      mediaRecorder.onstop = () => {
+      };      mediaRecorder.onstop = () => {
         const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
         const audioUrl = URL.createObjectURL(audioBlob);
         setAudioURL(audioUrl);
-          // Store recording data for later use when submitting answer
+        
+        // Calculate final duration from start time
+        const finalDuration = startTimeRef.current ? 
+          Math.floor((Date.now() - startTimeRef.current) / 1000) : duration;
+        
+        // Get current transcript from refs (more reliable than state)
+        const finalTranscript = transcriptRef.current + 
+          (interimTranscriptRef.current ? ' ' + interimTranscriptRef.current : '');
+        
+        console.log('MediaRecorder onstop - Final transcript from refs:', {
+          transcriptRef: transcriptRef.current,
+          interimTranscriptRef: interimTranscriptRef.current,
+          finalTranscript: finalTranscript
+        });
+        
+        // Store recording data for later use when submitting answer
         const recordingData = {
           audioBlob,
-          duration: duration, // Keep as number (seconds)
-          transcript,
+          duration: finalDuration, // Use calculated final duration
+          transcript: finalTranscript.trim(), // Use final transcript from refs
           timestamp: new Date().toISOString()
         };
+        
+        console.log('Recording data created:', {
+          duration: finalDuration,
+          transcript: finalTranscript.trim(),
+          audioBlobSize: audioBlob.size
+        });
         
         lastRecordingDataRef.current = recordingData;
         
@@ -132,22 +169,35 @@ const EnhancedLiveSpeech = forwardRef(({
       timerRef.current = setInterval(() => {
         const elapsed = Math.floor((Date.now() - startTimeRef.current) / 1000);
         setDuration(elapsed);
-      }, 1000);
-
-      // Start live transcription
-      await speechServiceRef.current.startListening({
+      }, 1000);      // Start live transcription
+      console.log('Starting speech recognition...');      await speechServiceRef.current.startListening({
         onResult: (result) => {
-          setInterimTranscript(result.interim || '');
+          console.log('Speech recognition result:', result);
+          
+          // Update interim transcript
+          const newInterim = result.interim || '';
+          setInterimTranscript(newInterim);
+          interimTranscriptRef.current = newInterim;
           
           if (result.isFinal && result.final.trim()) {
             const newText = result.final.trim();
+            console.log('Final speech text:', newText);
             setTranscript(prev => {
               const updated = prev + (prev ? ' ' : '') + newText;
+              console.log('Updated transcript:', updated);
+              
+              // Keep ref in sync
+              transcriptRef.current = updated;
+              
               if (onTranscriptionUpdate) {
                 onTranscriptionUpdate(updated);
               }
               return updated;
             });
+            
+            // Clear interim after final text is added
+            setInterimTranscript('');
+            interimTranscriptRef.current = '';
           }
         },
         onError: (error) => {
@@ -168,12 +218,32 @@ const EnhancedLiveSpeech = forwardRef(({
       toast.error('Failed to start live speech. Please check microphone permissions.');
       setIsActive(false);
     }
-  };
-
-  // Stop enhanced live speech
+  };  // Stop enhanced live speech
   const stopEnhancedLiveSpeech = () => {
+    // Calculate final duration before stopping timer
+    const finalDuration = startTimeRef.current ? 
+      Math.floor((Date.now() - startTimeRef.current) / 1000) : duration;
+    
+    // Get final transcript including any interim text from refs
+    const finalTranscript = transcriptRef.current + 
+      (interimTranscriptRef.current ? ' ' + interimTranscriptRef.current : '');
+    
+    console.log('Stopping recording - final values from refs:', {
+      transcriptRef: transcriptRef.current,
+      interimTranscriptRef: interimTranscriptRef.current,
+      finalTranscript: finalTranscript.trim(),
+      finalDuration: finalDuration
+    });
+    
+    // Update state with final values
+    setDuration(finalDuration);
+    setTranscript(finalTranscript.trim());
     setIsActive(false);
     setInterimTranscript('');
+    
+    // Update refs
+    transcriptRef.current = finalTranscript.trim();
+    interimTranscriptRef.current = '';
     
     // Stop speech recognition
     if (speechServiceRef.current) {
@@ -229,6 +299,10 @@ const EnhancedLiveSpeech = forwardRef(({
     setAudioDuration(0);
     setIsPlaying(false);
     lastRecordingDataRef.current = null;
+    
+    // Clear refs
+    transcriptRef.current = '';
+    interimTranscriptRef.current = '';
     
     // Clean up audio element
     if (audioElementRef.current) {

@@ -37,11 +37,10 @@ async def analyze_voice_recording(
                 status_code=400,
                 detail="recording_id, session_id, and audio_data are required"
             )
-        
-        # Analyze the voice recording
+          # Analyze the voice recording
         analysis_result = await voice_analysis_service.analyze_voice_recording(
             recording_id=recording_id,
-            user_id=current_user.id,
+            user_id=str(current_user.id),  # Convert ObjectId to string
             session_id=session_id,
             question_index=question_index or 0,
             audio_data=audio_data,
@@ -214,11 +213,10 @@ async def practice_detailed_voice_analysis(
                 status_code=400,
                 detail="transcript and duration are required"
             )
-        
-        # Use the voice analysis service for comprehensive analysis
+          # Use the voice analysis service for comprehensive analysis
         analysis_result = await voice_analysis_service.analyze_voice_recording(
             recording_id=f"practice_{current_user.id}_{int(duration)}",
-            user_id=current_user.id,
+            user_id=str(current_user.id),  # Convert ObjectId to string
             session_id="practice_session",
             question_index=0,
             audio_data=audio_data,

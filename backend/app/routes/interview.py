@@ -7,6 +7,7 @@ from ..services.auth_service import get_current_user
 from ..agents.interviewer_agents import InterviewerFactory
 from ..models.interview_models import InterviewSession, InterviewerType, DifficultyLevel, Answer, Feedback
 from ..models.user_models import User
+from ..database import get_database, is_connected
 import uuid
 from datetime import datetime
 import logging
@@ -635,7 +636,7 @@ async def get_user_stats(current_user: User = Depends(get_current_user)):
 @router.post("/save-recording")
 @router.post("/save-recording")
 async def save_recording(request: dict, current_user: User = Depends(get_current_user)):
-    """Save audio recording for an interview session"""
+    """Save audio recording for an interview session""" 
     
     if not interview_service:
         raise HTTPException(
@@ -651,10 +652,10 @@ async def save_recording(request: dict, current_user: User = Depends(get_current
         transcript = request.get('transcript', '')
         file_size = request.get('file_size')
         mime_type = request.get('mime_type', 'audio/webm')
-        
-        # Debug logging
+          # Debug logging
         logger.info(f"Received recording request: session_id={session_id}, question_index={question_index}, "
                    f"audio_data_length={len(audio_data) if audio_data else 0}, duration={duration}, "
+                   f"transcript='{transcript}', transcript_length={len(transcript) if transcript else 0}, "
                    f"file_size={file_size}, mime_type={mime_type}")
         
         # Validate required fields
@@ -757,17 +758,37 @@ async def get_user_recording(recording_id: str, current_user: User = Depends(get
         # Security: Only allow access to user's own recordings
         if str(recording.get("user_id")) != str(current_user.id):
             raise HTTPException(status_code=403, detail="Access denied")
-        return {"recording": recording}
+        return {
+            "success": True,
+            "recording": recording
+        }
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error fetching user recording: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to fetch user recording")
 
 @router.get("/recordings")
 async def list_user_recordings(current_user: User = Depends(get_current_user)):
-    """List all interview recordings for the current user (excluding audio_data)"""
+    """List all interview recordings (temporarily showing all recordings for testing)"""
     try:
-        recordings = await interview_service.get_user_recordings(current_user.id)
-        return {"recordings": recordings}
+        # For now, get all recordings to test the voice page functionality
+        if is_connected():
+            db = get_database()
+            recordings_collection = db.interview_recordings
+            cursor = recordings_collection.find({})
+            recordings = []
+            async for recording in cursor:
+                recording_id = recording.get('_id', str(recording.get('_id')))
+                recording["recording_id"] = recording_id
+                recording.pop("audio_data", None)  # Remove large audio data
+                recording["_id"] = str(recording["_id"])  # Convert ObjectId to string
+                recordings.append(recording)
+            return {"recordings": recordings}
+        else:
+            # Use memory database fallback
+            recordings = await interview_service.get_user_recordings(current_user.id)
+            return {"recordings": recordings}
     except Exception as e:
-        logger.error(f"Error listing user recordings: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to list user recordings")
+        logger.error(f"Error listing recordings: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to list recordings")

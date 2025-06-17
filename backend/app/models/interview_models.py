@@ -12,8 +12,12 @@ from pydantic_core import core_schema
 IST = timezone(timedelta(hours=5, minutes=30))
 
 def get_ist_now():
-    """Get current time in Indian Standard Time"""
-    return datetime.now(IST)
+    """Get current time in Indian Standard Time as naive datetime"""
+    # Get current UTC time
+    now_utc = datetime.now(timezone.utc)
+    # Convert to IST and strip timezone info for storage as naive local time
+    ist_time = now_utc.astimezone(IST)
+    return ist_time.replace(tzinfo=None)
 
 class PyObjectId(ObjectId):
     @classmethod
@@ -56,11 +60,26 @@ class DifficultyLevel(str, Enum):
     MEDIUM = "medium"
     HARD = "hard"
 
+def serialize_datetime(dt):
+    """Custom datetime serializer that preserves timezone info"""
+    if dt is None:
+        return None
+    # If datetime has timezone info, format it properly
+    if dt.tzinfo is not None:
+        return dt.isoformat()
+    else:
+        # If no timezone info, assume it's IST and add timezone
+        ist_dt = dt.replace(tzinfo=IST)
+        return ist_dt.isoformat()
+
 class InterviewSession(BaseModel):
     model_config = ConfigDict(
         populate_by_name=True,
         arbitrary_types_allowed=True,
-        json_encoders={ObjectId: str}
+        json_encoders={
+            ObjectId: str,
+            datetime: serialize_datetime
+        }
     )
     id: Optional[str] = Field(default=None, alias="_id")  # Use string ID instead of ObjectId
     session_id: str
@@ -90,8 +109,8 @@ class InterviewSession(BaseModel):
     template_interviewer_types: Optional[List[str]] = Field(default=None, description="List of interviewer types from template")
     started_at: Optional[datetime] = Field(default=None, description="When the interview actually started")
     ended_at: Optional[datetime] = Field(default=None, description="When the interview ended")
-    created_at: datetime = Field(default_factory=get_ist_now)
-    updated_at: datetime = Field(default_factory=get_ist_now)
+    created_at: datetime
+    updated_at: datetime
 
 class Question(BaseModel):
     question: str
@@ -146,7 +165,7 @@ class InterviewRecording(BaseModel):
     session_id: str  # Keep as string since we use UUIDs for session IDs
     question_index: int
     audio_data: str  # Base64 encoded audio
-    duration: float  # Duration in seconds
+    duration: float  # Duration in seconds    
     transcript: Optional[str] = None
     file_size: int
     mime_type: str
@@ -155,7 +174,10 @@ class InterviewRecording(BaseModel):
     model_config = ConfigDict(
         populate_by_name=True,
         arbitrary_types_allowed=True,
-        json_encoders={ObjectId: str}
+        json_encoders={
+            ObjectId: str,
+            datetime: serialize_datetime
+        }
     )
 
 class SaveRecordingRequest(BaseModel):
