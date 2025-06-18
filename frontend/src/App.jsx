@@ -9,15 +9,10 @@ import Signup from './pages/Signup';
 import Interview from './pages/Interview';
 import InterviewSession from './pages/InterviewSession';
 import Results from './pages/Results';
-import ResultsDebug from './pages/ResultsDebug';
 import Dashboard from './pages/Dashboard';
 import Templates from './pages/Templates';
-// import EnhancedTemplates from './pages/EnhancedTemplates';
-
-import Voice from './pages/Voice';
 import VoiceAnalysisPage from './pages/VoiceAnalysisPage';
-import Test from './pages/Test';
-import ConnectionTest from './pages/ConnectionTest';
+
 
 function AppContent() {
   const location = useLocation();
@@ -41,42 +36,29 @@ function AppContent() {
               <ProtectedRoute>
                 <InterviewSession />
               </ProtectedRoute>
-            } />            <Route path="/results/:sessionId" element={
+            } />            
+            <Route path="/results/:sessionId" element={
               <ProtectedRoute>
                 <Results />
               </ProtectedRoute>
             } />
-            <Route path="/results-debug/:sessionId" element={
-              <ProtectedRoute>
-                <ResultsDebug />
-              </ProtectedRoute>
-            } />
+
             <Route path="/dashboard" element={
               <ProtectedRoute>
                 <Dashboard />
               </ProtectedRoute>
-            } />            <Route path="/templates" element={
+            } />            
+            <Route path="/templates" element={
               <ProtectedRoute>
                 <Templates />
               </ProtectedRoute>
             } />
-            {/* <Route path="/enhanced-templates" element={
-              <ProtectedRoute>
-                <EnhancedTemplates />
-              </ProtectedRoute>
-            } /> */}            
-            {/* <Route path="/voice" element={
-              <ProtectedRoute>
-                <Voice />
-              </ProtectedRoute>
-            } /> */}
+
             <Route path="/voice-analysis" element={
               <ProtectedRoute>
                 <VoiceAnalysisPage />
               </ProtectedRoute>
             } />
-            <Route path="/test" element={<Test />} />
-            <Route path="/connection-test" element={<ConnectionTest />} />
             {/* Demo/Test Routes */}
           </Routes>
         </main>        <Toaster 

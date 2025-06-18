@@ -96,7 +96,8 @@ const Home = () => {
       window.removeEventListener('authStateChanged', handleAuthChange);
       document.removeEventListener('click', handleClickOutside);
     };
-  }, [showUserDropdown]);  const features = [
+  }, [showUserDropdown]);  
+  const features = [
     {
       icon: <Users className="h-8 w-8 text-white" />,
       title: "Multi-Agent Interviewers",
@@ -108,22 +109,18 @@ const Home = () => {
       title: "AI-Powered Feedback",
       description: "Get detailed, personalized feedback on your answers with specific suggestions for improvement from Google Gemini AI.",
       link: "/interview"
-    },    {
+    },    
+    {
       icon: <Layers className="h-8 w-8 text-white" />,
       title: "Interview Templates",
       description: "Choose from pre-built interview templates tailored for specific job roles and industries. Skip the setup and start practicing immediately.",
-      link: "/templates"    },
+      link: "/templates"    
+    },
     {
       icon: <Mic className="h-8 w-8 text-white" />,
       title: "Voice Analysis",
       description: "Improve your speaking skills with AI-powered voice analysis, speech coaching, and personalized feedback on your communication.",
       link: "/voice-analysis"
-    },
-    {
-      icon: <Zap className="h-8 w-8 text-white" />,
-      title: "Real-time Coaching",
-      description: "Get instant feedback during your practice sessions with adaptive questioning and personalized coaching tips.",
-      link: "/interview"
     }
   ];
   const interviewerTypes = [
@@ -169,7 +166,8 @@ const Home = () => {
     <div className="w-full min-h-screen bg-gray-900 overflow-hidden">      {/* User Profile Dropdown - Top Right */}
       {user && (
         <div className="fixed top-6 right-6 z-50 user-dropdown">
-          <div className="relative">            <button
+          <div className="relative">            
+          <button
               onClick={() => setShowUserDropdown(!showUserDropdown)}
               className="flex items-center glass-morphism-dark border border-gray-600/30 rounded-full p-2 hover:border-primary-500/50 transition-all duration-300"
             >
@@ -353,7 +351,8 @@ const Home = () => {
           <p className="text-xl text-gray-300 max-w-3xl mx-auto mb-5">
             Master every aspect of interview success with our comprehensive AI-powered platform
           </p>
-        </div>          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-7xl mx-auto perspective-1000 mt-5">
+        </div>          
+        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8 max-w-7xl mx-auto perspective-1000 mt-5">
           {features.map((feature, index) => (
             <Link
               key={index} 
@@ -509,25 +508,24 @@ const Home = () => {
           <div className="inline-flex items-center space-x-2 bg-gray-800/80 backdrop-blur-sm border border-gray-700 rounded-full px-6 py-2 shadow-lg">
             <CheckCircle className="h-5 w-5 text-primary-400" />
             <span className="text-sm font-medium text-gray-200">Simple Process</span>
-          </div>
-          <h2 className="text-4xl md:text-5xl font-bold text-white">
+          </div>          <h2 className="text-4xl md:text-5xl font-bold text-white">
             Get Started in
             <span className="block text-white bg-clip-text bg-gradient-to-r from-primary-400 to-purple-400">
-              4 Easy Steps
+              5 Easy Steps
             </span>
           </h2>
         </div>
 
-        <div className="grid md:grid-cols-4 gap-8 max-w-6xl mx-auto items-start">
+        <div className="grid md:grid-cols-5 gap-6 max-w-7xl mx-auto items-start">
           {[
-            { step: "01", title: "Upload Resume", desc: "Upload your resume or paste the job description for personalized questions", icon: <Brain className="h-6 w-6" />, bgColor: "from-blue-500 to-blue-600" },
-            { step: "02", title: "Choose Interviewer", desc: "Select from HR, Technical, or Behavioral interviewer based on your needs", icon: <Users className="h-6 w-6" />, bgColor: "from-green-500 to-emerald-600" },
-            { step: "03", title: "Practice Interview", desc: "Answer AI-generated questions tailored to your profile and experience", icon: <Target className="h-6 w-6" />, bgColor: "from-purple-500 to-indigo-600" },
-            { step: "04", title: "Get Feedback", desc: "Receive detailed feedback and improvement suggestions instantly", icon: <Trophy className="h-6 w-6" />, bgColor: "from-pink-500 to-rose-600" }
+            { step: "01", title: "Choose Your Path", desc: "Select from pre-built interview templates or customize your own interview experience", icon: <Layers className="h-6 w-6" />, bgColor: "from-indigo-500 to-purple-600" },
+            { step: "02", title: "Upload Resume", desc: "Upload your resume or paste the job description for personalized questions", icon: <Brain className="h-6 w-6" />, bgColor: "from-blue-500 to-blue-600" },
+            { step: "03", title: "Choose Interviewer", desc: "Select from HR, Technical, or Behavioral interviewer based on your needs", icon: <Users className="h-6 w-6" />, bgColor: "from-green-500 to-emerald-600" },
+            { step: "04", title: "Practice Interview", desc: "Answer AI-generated questions tailored to your profile and experience", icon: <Target className="h-6 w-6" />, bgColor: "from-purple-500 to-indigo-600" },
+            { step: "05", title: "Get Feedback", desc: "Receive detailed feedback and improvement suggestions instantly", icon: <Trophy className="h-6 w-6" />, bgColor: "from-pink-500 to-rose-600" }
           ].map((item, index) => (
-            <div key={index} className="relative text-center group perspective-1000 h-full flex flex-col">
-              {/* Enhanced connection line with gradient */}
-              {index < 3 && (
+            <div key={index} className="relative text-center group perspective-1000 h-full flex flex-col">              {/* Enhanced connection line with gradient */}
+              {index < 4 && (
                 <div className="hidden md:block absolute top-16 left-full w-full h-1 bg-gradient-to-r from-primary-400 via-purple-400 to-pink-400 transform translate-x-4 -translate-y-1/2 opacity-30 group-hover:opacity-60 transition-opacity duration-300 animate-pulse z-10"></div>
               )}
               
