@@ -23,10 +23,9 @@ AI-powered interview preparation platform with multi-agent system for realistic 
   - Voice confidence metrics
 - **Audio Playback**: Review recorded responses with built-in audio player
 
-### Interview Templates & Customization
+### Interview Templates
 - **Interview Templates**: Pre-built templates for different roles and industries
 - **Role-Based Questions**: Customized question sets based on job position
-- **Template Management**: Create, edit, and manage custom interview templates
 - **Key Skills Mapping**: Templates include relevant technical and soft skills assessment
 
 ### Performance Analytics & Insights
