@@ -71,7 +71,8 @@ class TechLeadInterviewer(BaseInterviewer):
             "Problem-solving methodology",
             "System design and architecture",
             "Code quality and best practices",
-            "Technology stack proficiency"
+            "Technology stack proficiency",
+            "Coding skills and algorithmic thinking"
         ]
     async def generate_questions(self, resume_text: str, job_description: str, difficulty: str = "medium", num_questions: int = 5) -> List[str]:
         """Generate technical interview questions"""

@@ -41,7 +41,8 @@ async def get_interviewer_types():
                     "Problem-solving methodology",
                     "System design and architecture",
                     "Code quality and best practices",
-                    "Technology stack proficiency"
+                    "Technology stack proficiency",
+                    "Coding skills and algorithmic thinking"
                 ]
             },
             {
